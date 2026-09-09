@@ -1,0 +1,20 @@
+## ── .NET / Visual Studio (NODUS.API, NODUS.Data, NODUS.Models, NODUS.Services, NODUS.WPF) ──
+bin/
+obj/
+*.user
+*.suo
+.vs/
+
+## ── Node / React (nodus-frontend) ──
+node_modules/
+dist/
+build/
+.env
+.env.local
+
+## ── Sistema operativo ──
+.DS_Store
+Thumbs.db
+
+## ── Otros ──
+*.log
