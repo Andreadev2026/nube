@@ -168,7 +168,7 @@ function Insumos() {
   return (
     <>
       {/* ── HEADER ── */}
-      <div style={{ padding: '20px 24px 0', background: 'white' }}>
+      <div className="rwd-page-header" style={{ padding: '20px 24px 0', background: 'white' }}>
         <div style={{
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
           marginBottom: 4, flexWrap: 'wrap', gap: 12
@@ -290,8 +290,8 @@ function Insumos() {
       </div>
 
       {/* ── TABLA MINIMALISTA ── */}
-      <div style={{ padding: '20px 24px', background: 'white' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+      <div className="rwd-table-wrap" style={{ padding: '20px 24px', background: 'white', overflowX: 'auto' }}>
+        <table className="rwd-table" style={{ width: '100%', borderCollapse: 'collapse', minWidth: 650 }}>
           <thead>
             <tr style={{ textAlign: 'left' }}>
               <th style={thStyle}>Nombre</th>
@@ -380,6 +380,7 @@ function Insumos() {
       {modalAbierto && (
         <div
           onClick={cerrarModal}
+          className="rwd-modal-overlay"
           style={{
             position:'fixed', top:0, left:0, right:0, bottom:0,
             background:'rgba(20,25,40,0.6)', backdropFilter: 'blur(4px)',
@@ -389,6 +390,7 @@ function Insumos() {
         >
           <div
             onClick={(e) => e.stopPropagation()}
+            className="rwd-modal-box"
             style={{
               background:'white', borderRadius:16,
               maxWidth:640, width:'100%', maxHeight:'92vh',
@@ -451,7 +453,7 @@ function Insumos() {
 
               {/* SECCIÓN 1: IDENTIFICACIÓN */}
               <SeccionTitulo icono="📋" titulo="Identificación del insumo" />
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 22 }}>
+              <div className="rwd-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 22 }}>
                 <div>
                   <label style={lblStyle}>Nombre *</label>
                   <input
@@ -482,7 +484,7 @@ function Insumos() {
 
               {/* SECCIÓN 2: STOCK */}
               <SeccionTitulo icono="📊" titulo="Niveles de stock" />
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 6 }}>
+              <div className="rwd-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 6 }}>
                 <div>
                   <label style={lblStyle}>Stock actual *</label>
                   <input
@@ -564,7 +566,7 @@ const thStyle = {
   textTransform: 'uppercase', letterSpacing: '0.4px'
 };
 const tdStyle = {
-  padding: '14px 8px', fontSize: 13, color: '#2D3748'
+  padding: '14px 8px', fontSize: 13, color: '#2D3748', whiteSpace: 'nowrap'
 };
 const lblStyle = {
   display:'block', fontSize:11, fontWeight:600, color:'#4A5868',

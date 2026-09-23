@@ -262,7 +262,7 @@ function Ubicaciones() {
   return (
     <>
       {/* ── HEADER ── */}
-      <div style={{ padding: '20px 24px 0', background: 'white' }}>
+      <div className="rwd-page-header" style={{ padding: '20px 24px 0', background: 'white' }}>
         <div style={{
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
           marginBottom: 18, flexWrap: 'wrap', gap: 12
@@ -301,7 +301,7 @@ function Ubicaciones() {
       </div>
 
       {/* ── KANBAN ── */}
-      <div style={{
+      <div className="rwd-table-wrap" style={{
         padding: '20px 24px', background: 'white',
         display: 'flex', gap: 16, overflowX: 'auto',
         alignItems: 'flex-start', minHeight: 400
@@ -390,6 +390,7 @@ function Ubicaciones() {
       {modalAbierto && (
         <div
           onClick={cerrarModal}
+          className="rwd-modal-overlay"
           style={{
             position:'fixed', top:0, left:0, right:0, bottom:0,
             background:'rgba(20,25,40,0.6)', backdropFilter: 'blur(4px)',
@@ -399,6 +400,7 @@ function Ubicaciones() {
         >
           <div
             onClick={(e) => e.stopPropagation()}
+            className="rwd-modal-box"
             style={{
               background:'white', borderRadius:16,
               maxWidth:680, width:'100%', maxHeight:'92vh',
@@ -562,7 +564,7 @@ function Ubicaciones() {
 
               {/* SECCIÓN 2: MOVIMIENTO */}
               <SeccionTitulo icono="🔄" titulo="Movimiento entre sectores" />
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: 12, alignItems: 'end', marginBottom: 22 }}>
+              <div className="rwd-grid" style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: 12, alignItems: 'end', marginBottom: 22 }}>
                 <div>
                   <label style={lblStyle}>Sector de origen *</label>
                   <select
@@ -595,7 +597,7 @@ function Ubicaciones() {
 
               {/* SECCIÓN 3: ASIGNACIÓN */}
               <SeccionTitulo icono="📋" titulo="Asignación y responsable" />
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 6 }}>
+              <div className="rwd-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 6 }}>
                 <div>
                   <label style={lblStyle}>Fecha del traslado *</label>
                   <DatePicker
@@ -666,6 +668,7 @@ function Ubicaciones() {
       {modalHistorialEquipo && (
         <div
           onClick={() => setModalHistorialEquipo(null)}
+          className="rwd-modal-overlay"
           style={{
             position:'fixed', top:0, left:0, right:0, bottom:0,
             background:'rgba(0,0,0,0.5)', display:'flex',
@@ -674,6 +677,7 @@ function Ubicaciones() {
         >
           <div
             onClick={(e) => e.stopPropagation()}
+            className="rwd-modal-box"
             style={{
               background:'white', borderRadius:12, padding:24,
               maxWidth:600, width:'100%', maxHeight:'90vh',

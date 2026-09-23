@@ -117,7 +117,7 @@ function HojasDeVida() {
   return (
     <>
       {/* ── HEADER ── */}
-      <div style={{ padding: '20px 24px 0', background: 'white' }}>
+      <div className="rwd-page-header" style={{ padding: '20px 24px 0', background: 'white' }}>
         <div style={{
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
           marginBottom: 18, flexWrap: 'wrap', gap: 12
@@ -156,7 +156,7 @@ function HojasDeVida() {
       </div>
 
       {/* ── PANEL MAESTRO-DETALLE ── */}
-      <div style={{
+      <div className="rwd-grid" style={{
         display: 'grid', gridTemplateColumns: '340px 1fr',
         gap: 0, background: 'white',
         minHeight: 600, borderTop: '1px solid #E5EDF3'
@@ -288,6 +288,7 @@ function HojasDeVida() {
       {modalMasivo && (
         <div
           onClick={() => setModalMasivo(false)}
+          className="rwd-modal-overlay"
           style={{
             position:'fixed', top:0, left:0, right:0, bottom:0,
             background:'rgba(20,25,40,0.6)', backdropFilter: 'blur(4px)',
@@ -297,6 +298,7 @@ function HojasDeVida() {
         >
           <div
             onClick={(e) => e.stopPropagation()}
+            className="rwd-modal-box"
             style={{
               background:'white', borderRadius:16,
               maxWidth:520, width:'100%',
@@ -452,7 +454,7 @@ function HistoriaDetalle({ historia, colorMarca, colorTipo }) {
             <div style={{ fontSize: 14, fontWeight: 500, color: '#1a1a1a', marginBottom: 8 }}>
               {equipo.modelo}
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, fontSize: 12 }}>
+            <div className="rwd-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, fontSize: 12 }}>
               <div>
                 <div style={{ color: '#9E9CBB', fontSize: 10, textTransform: 'uppercase', marginBottom: 2 }}>Id</div>
                 <div style={{ color: '#2D3748', fontWeight: 500 }}>{equipo.idEquipo}</div>

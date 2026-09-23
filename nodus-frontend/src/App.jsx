@@ -18,9 +18,12 @@ import {
   IconChartBar,
   IconList,
   IconArrowsExchange,
-  IconBuildingHospital
+  IconBuildingHospital,
+  IconMenu2,
+  IconX
 } from '@tabler/icons-react';
 import api from './api';
+import { puedeVerModulo } from './permisos';
 import Login from './pages/Login';
 import Marcas from './pages/Marcas';
 import Activos from './pages/Activos';
@@ -39,10 +42,11 @@ import Bienvenida from './pages/Bienvenida';
 import Reportes from './pages/Reportes';
 import Prestamos from './pages/Prestamos';
 import HospitalesExternos from './pages/HospitalesExternos';
+import FichaEquipo from './pages/FichaEquipo';
 import './App.css';
 
 /* Sidebar como componente separado para usar useLocation */
-function Sidebar({ auth, onLogout }) {
+function Sidebar({ auth, onLogout, mobileOpen, onNavigate }) {
   const location = useLocation();
   const rol = auth.usuario.rol;
   const iniciales = auth.usuario.nombre?.charAt(0).toUpperCase() || 'U';
@@ -89,10 +93,10 @@ function Sidebar({ auth, onLogout }) {
   };
 
   return (
-    <aside className="sidebar-nodus no-print">
+    <aside className={`sidebar-nodus no-print${mobileOpen ? ' sn-open' : ''}`}>
 
       {/* Logo - ahora clickeable, lleva al home */}
-      <NavLink to="/" className="sn-logo" style={{ textDecoration: 'none' }}>
+      <NavLink to="/" className="sn-logo" style={{ textDecoration: 'none' }} onClick={onNavigate}>
         <div className="sn-logo-icon">
           <img src="/logonodus.jpg" alt="NODUS" />
         </div>
@@ -102,62 +106,73 @@ function Sidebar({ auth, onLogout }) {
       </NavLink>
 
       {/* Navegación */}
-      <nav className="sn-nav">
+      <nav
+        className="sn-nav"
+        onClick={(e) => { if (e.target.closest('.sn-item')) onNavigate?.(); }}
+      >
 
         {/* GESTIÓN PATRIMONIAL */}
-        <div
-          className="sn-group-title sn-group-clickable"
-          onClick={() => toggle('patrimonial')}
-        >
-          <IconLayoutDashboard size={14} stroke={2} />
-          <span>Gestión patrimonial</span>
-        </div>
-        {abiertos.patrimonial && (
-          <div className="sn-group-content">
-            <NavLink to="/activos" className="sn-item">
-              <IconStethoscope size={16} stroke={2} />
-              <span>Activos</span>
-            </NavLink>
-            <NavLink to="/ubicaciones" className="sn-item">
-              <IconMapPin size={16} stroke={2} />
-              <span>Ubicaciones</span>
-            </NavLink>
-            {(rol === 'Administrador' || rol === 'Jefe patrimonio') && (
-              <NavLink to="/bajaspatrimoniales" className="sn-item">
-                <IconArchive size={16} stroke={2} />
-                <span>Bajas patrimoniales</span>
-              </NavLink>
+        {puedeVerModulo(rol, 'patrimonial') && (
+          <>
+            <div
+              className="sn-group-title sn-group-clickable"
+              onClick={() => toggle('patrimonial')}
+            >
+              <IconLayoutDashboard size={14} stroke={2} />
+              <span>Gestión patrimonial</span>
+            </div>
+            {abiertos.patrimonial && (
+              <div className="sn-group-content">
+                <NavLink to="/activos" className="sn-item">
+                  <IconStethoscope size={16} stroke={2} />
+                  <span>Activos</span>
+                </NavLink>
+                <NavLink to="/ubicaciones" className="sn-item">
+                  <IconMapPin size={16} stroke={2} />
+                  <span>Ubicaciones</span>
+                </NavLink>
+                {(rol === 'Administrador' || rol === 'Jefe patrimonio') && (
+                  <NavLink to="/bajaspatrimoniales" className="sn-item">
+                    <IconArchive size={16} stroke={2} />
+                    <span>Bajas patrimoniales</span>
+                  </NavLink>
+                )}
+              </div>
             )}
-          </div>
+          </>
         )}
 
         {/* GESTIÓN DE MANTENIMIENTO */}
-        <div
-          className="sn-group-title sn-group-clickable"
-          onClick={() => toggle('mantenimiento')}
-        >
-          <IconTools size={14} stroke={2} />
-          <span>Gestión de mantenimiento</span>
-        </div>
-        {abiertos.mantenimiento && (
-          <div className="sn-group-content">
-            <NavLink to="/ordenestrabajo" className="sn-item">
-              <IconClipboardList size={16} stroke={2} />
-              <span>Órdenes de trabajo</span>
-            </NavLink>
-            <NavLink to="/intervenciones" className="sn-item">
-              <IconSettings size={16} stroke={2} />
-              <span>Tareas de mantenimiento</span>
-            </NavLink>
-            <NavLink to="/hojasdevida" className="sn-item">
-              <IconFileText size={16} stroke={2} />
-              <span>Hojas de vida</span>
-            </NavLink>
-          </div>
+        {puedeVerModulo(rol, 'mantenimiento') && (
+          <>
+            <div
+              className="sn-group-title sn-group-clickable"
+              onClick={() => toggle('mantenimiento')}
+            >
+              <IconTools size={14} stroke={2} />
+              <span>Gestión de mantenimiento</span>
+            </div>
+            {abiertos.mantenimiento && (
+              <div className="sn-group-content">
+                <NavLink to="/ordenestrabajo" className="sn-item">
+                  <IconClipboardList size={16} stroke={2} />
+                  <span>Órdenes de trabajo</span>
+                </NavLink>
+                <NavLink to="/intervenciones" className="sn-item">
+                  <IconSettings size={16} stroke={2} />
+                  <span>Tareas de mantenimiento</span>
+                </NavLink>
+                <NavLink to="/hojasdevida" className="sn-item">
+                  <IconFileText size={16} stroke={2} />
+                  <span>Hojas de vida</span>
+                </NavLink>
+              </div>
+            )}
+          </>
         )}
 
         {/* GESTIÓN DE INSUMOS */}
-        {(rol === 'Administrador' || rol === 'Jefe patrimonio') && (
+        {puedeVerModulo(rol, 'insumos') && (
           <>
             <div
               className="sn-group-title sn-group-clickable"
@@ -182,49 +197,57 @@ function Sidebar({ auth, onLogout }) {
         )}
 
         {/* GESTIÓN DE PRÉSTAMOS */}
-        <div
-          className="sn-group-title sn-group-clickable"
-          onClick={() => toggle('prestamos')}
-        >
-          <IconArrowsExchange size={14} stroke={2} />
-          <span>Gestión de préstamos</span>
-        </div>
-        {abiertos.prestamos && (
-          <div className="sn-group-content">
-            <NavLink to="/prestamos" className="sn-item">
-              <IconArrowsExchange size={16} stroke={2} />
-              <span>Préstamos</span>
-            </NavLink>
-            <NavLink to="/hospitalesexternos" className="sn-item">
-              <IconBuildingHospital size={16} stroke={2} />
-              <span>Hospitales externos</span>
-            </NavLink>
-          </div>
+        {puedeVerModulo(rol, 'prestamos') && (
+          <>
+            <div
+              className="sn-group-title sn-group-clickable"
+              onClick={() => toggle('prestamos')}
+            >
+              <IconArrowsExchange size={14} stroke={2} />
+              <span>Gestión de préstamos</span>
+            </div>
+            {abiertos.prestamos && (
+              <div className="sn-group-content">
+                <NavLink to="/prestamos" className="sn-item">
+                  <IconArrowsExchange size={16} stroke={2} />
+                  <span>Préstamos</span>
+                </NavLink>
+                <NavLink to="/hospitalesexternos" className="sn-item">
+                  <IconBuildingHospital size={16} stroke={2} />
+                  <span>Hospitales externos</span>
+                </NavLink>
+              </div>
+            )}
+          </>
         )}
 
         {/* REPORTES */}
-        <div
-          className="sn-group-title sn-group-clickable"
-          onClick={() => toggle('reportes')}
-        >
-          <IconChartBar size={14} stroke={2} />
-          <span>Reportes</span>
-        </div>
-        {abiertos.reportes && (
-          <div className="sn-group-content">
-            <NavLink to="/reportes" end className="sn-item">
-              <IconLayoutDashboard size={16} stroke={2} />
-              <span>Dashboard</span>
-            </NavLink>
-            <NavLink to="/reportes/listados" className="sn-item">
-              <IconList size={16} stroke={2} />
-              <span>Listados</span>
-            </NavLink>
-          </div>
+        {puedeVerModulo(rol, 'reportes') && (
+          <>
+            <div
+              className="sn-group-title sn-group-clickable"
+              onClick={() => toggle('reportes')}
+            >
+              <IconChartBar size={14} stroke={2} />
+              <span>Reportes</span>
+            </div>
+            {abiertos.reportes && (
+              <div className="sn-group-content">
+                <NavLink to="/reportes" end className="sn-item">
+                  <IconLayoutDashboard size={16} stroke={2} />
+                  <span>Dashboard</span>
+                </NavLink>
+                <NavLink to="/reportes/listados" className="sn-item">
+                  <IconList size={16} stroke={2} />
+                  <span>Listados</span>
+                </NavLink>
+              </div>
+            )}
+          </>
         )}
 
         {/* ADMINISTRACIÓN */}
-        {rol === 'Administrador' && (
+        {puedeVerModulo(rol, 'administracion') && (
           <>
             <div
               className="sn-group-title sn-group-clickable"
@@ -262,8 +285,17 @@ function Sidebar({ auth, onLogout }) {
   );
 }
 
+function RutaProtegida({ auth, modulo, children }) {
+  const rol = auth?.usuario?.rol;
+  if (!puedeVerModulo(rol, modulo)) {
+    return <Navigate to="/" replace />;
+  }
+  return children;
+}
+
 function App() {
   const [auth, setAuth] = useState(null);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   const handleLogin = (data) => { setAuth(data); };
   const handleLogout = () => { setAuth(null); };
@@ -275,29 +307,45 @@ function App() {
   return (
     <BrowserRouter>
       <div className="app">
-        <Sidebar auth={auth} onLogout={handleLogout} />
+        <button
+          className="sn-hamburger no-print"
+          onClick={() => setMobileNavOpen(o => !o)}
+          aria-label={mobileNavOpen ? 'Cerrar menú' : 'Abrir menú'}
+        >
+          {mobileNavOpen ? <IconX size={22} /> : <IconMenu2 size={22} />}
+        </button>
+        {mobileNavOpen && (
+          <div className="sn-overlay no-print" onClick={() => setMobileNavOpen(false)} />
+        )}
+        <Sidebar
+          auth={auth}
+          onLogout={handleLogout}
+          mobileOpen={mobileNavOpen}
+          onNavigate={() => setMobileNavOpen(false)}
+        />
         <main className="content">
           <Routes>
             <Route path="/" element={<Bienvenida auth={auth} />} />
             <Route path="/marcas" element={<Marcas />} />
             <Route path="/sectores" element={<Sectores />} />
             <Route path="/servicios" element={<Servicios />} />
-            <Route path="/activos" element={<Activos />} />
+            <Route path="/activos" element={<RutaProtegida auth={auth} modulo="patrimonial"><Activos /></RutaProtegida>} />
+            <Route path="/ficha/:idEquipo" element={<FichaEquipo auth={auth} />} />
             <Route path="/equipos" element={<Navigate to="/activos" />} />
-            <Route path="/ubicaciones" element={<Ubicaciones />} />
-            <Route path="/insumos" element={<Insumos />} />
-            <Route path="/ordenestrabajo" element={<OrdenesTrabajo />} />
-            <Route path="/intervenciones" element={<Intervenciones />} />
-            <Route path="/usosinsumo" element={<UsosInsumo />} />
+            <Route path="/ubicaciones" element={<RutaProtegida auth={auth} modulo="patrimonial"><Ubicaciones /></RutaProtegida>} />
+            <Route path="/insumos" element={<RutaProtegida auth={auth} modulo="insumos"><Insumos /></RutaProtegida>} />
+            <Route path="/ordenestrabajo" element={<RutaProtegida auth={auth} modulo="mantenimiento"><OrdenesTrabajo /></RutaProtegida>} />
+            <Route path="/intervenciones" element={<RutaProtegida auth={auth} modulo="mantenimiento"><Intervenciones /></RutaProtegida>} />
+            <Route path="/usosinsumo" element={<RutaProtegida auth={auth} modulo="insumos"><UsosInsumo /></RutaProtegida>} />
             <Route path="/alertas" element={<Alertas auth={auth} />} />
-            <Route path="/bajaspatrimoniales" element={<BajasPatrimoniales />} />
-            <Route path="/hojasdevida" element={<HojasDeVida />} />
-            <Route path="/usuarios" element={<Usuarios />} />
-            <Route path="/prestamos" element={<Prestamos auth={auth} />} />
-            <Route path="/hospitalesexternos" element={<HospitalesExternos />} />
+            <Route path="/bajaspatrimoniales" element={<RutaProtegida auth={auth} modulo="patrimonial"><BajasPatrimoniales /></RutaProtegida>} />
+            <Route path="/hojasdevida" element={<RutaProtegida auth={auth} modulo="mantenimiento"><HojasDeVida /></RutaProtegida>} />
+            <Route path="/usuarios" element={<RutaProtegida auth={auth} modulo="administracion"><Usuarios /></RutaProtegida>} />
+            <Route path="/prestamos" element={<RutaProtegida auth={auth} modulo="prestamos"><Prestamos auth={auth} /></RutaProtegida>} />
+            <Route path="/hospitalesexternos" element={<RutaProtegida auth={auth} modulo="prestamos"><HospitalesExternos /></RutaProtegida>} />
             <Route path="*" element={<Navigate to="/" />} />
-            <Route path="/reportes" element={<Reportes />} />
-            <Route path="/reportes/listados" element={<Reportes />} />
+            <Route path="/reportes" element={<RutaProtegida auth={auth} modulo="reportes"><Reportes /></RutaProtegida>} />
+            <Route path="/reportes/listados" element={<RutaProtegida auth={auth} modulo="reportes"><Reportes /></RutaProtegida>} />
           </Routes>
         </main>
       </div>

@@ -359,7 +359,7 @@ function OrdenesTrabajo() {
   return (
     <>
       {/* ── HEADER ── */}
-      <div style={{ padding: '20px 24px 0', background: 'white' }}>
+      <div className="rwd-page-header" style={{ padding: '20px 24px 0', background: 'white' }}>
         <div style={{
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
           marginBottom: 4, flexWrap: 'wrap', gap: 12
@@ -557,6 +557,7 @@ function OrdenesTrabajo() {
       {modalAbierto && (
         <div
           onClick={cerrarModal}
+          className="rwd-modal-overlay"
           style={{
             position:'fixed', top:0, left:0, right:0, bottom:0,
             background:'rgba(20,25,40,0.6)', backdropFilter: 'blur(4px)',
@@ -566,6 +567,7 @@ function OrdenesTrabajo() {
         >
           <div
             onClick={(e) => e.stopPropagation()}
+            className="rwd-modal-box"
             style={{
               background:'white', borderRadius:16,
               maxWidth:720, width:'100%', maxHeight:'92vh',
@@ -771,7 +773,7 @@ function OrdenesTrabajo() {
               {/* SECCIÓN 3: ASIGNACIÓN */}
               <div style={{ marginTop: 22 }}>
                 <SeccionTitulo icono="📋" titulo="Asignación y fecha" />
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                <div className="rwd-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                   <div>
                  <label style={lblStyle}>Fecha de apertura *</label>
                     <DatePicker

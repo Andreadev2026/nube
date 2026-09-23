@@ -75,7 +75,7 @@ function HospitalesExternos() {
 
   return (
     <>
-      <div style={{ padding: '20px 24px 0', background: 'white' }}>
+      <div className="rwd-page-header" style={{ padding: '20px 24px 0', background: 'white' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
             <h2 style={{ fontSize: 16, fontWeight: 700, color: '#1a1a1a', margin: 0, letterSpacing: '0.5px' }}>GESTIÓN DE PRÉSTAMOS</h2>
@@ -98,8 +98,8 @@ function HospitalesExternos() {
         </div>
       </div>
 
-      <div style={{ padding: '20px 24px', background: 'white' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+      <div className="rwd-table-wrap" style={{ padding: '20px 24px', background: 'white', overflowX: 'auto' }}>
+        <table className="rwd-table" style={{ width: '100%', borderCollapse: 'collapse', minWidth: 720 }}>
           <thead>
             <tr>
               <th style={thStyle}>Nombre</th>
@@ -134,8 +134,8 @@ function HospitalesExternos() {
       </div>
 
       {modalAbierto && (
-        <div onClick={cerrarModal} style={overlayStyle}>
-          <div onClick={e => e.stopPropagation()} style={{ ...modalStyle, maxWidth: 560 }}>
+        <div onClick={cerrarModal} className="rwd-modal-overlay" style={overlayStyle}>
+          <div onClick={e => e.stopPropagation()} className="rwd-modal-box" style={{ ...modalStyle, maxWidth: 560 }}>
             <div style={modalHeaderStyle}>
               <div style={{ width: 52, height: 52, borderRadius: 12, background: 'linear-gradient(135deg, #EEF3FB 0%, #DCE7F5 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>🏥</div>
               <div style={{ flex: 1 }}>
@@ -152,7 +152,7 @@ function HospitalesExternos() {
               <input value={nombre} onChange={e => setNombre(e.target.value)} placeholder="Ej: Hospital Córdoba" style={inpStyle} />
               {errores.nombre && <span style={errStyle}>⚠ {errores.nombre}</span>}
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginTop: 14 }}>
+              <div className="rwd-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginTop: 14 }}>
                 <div>
                   <label style={lblStyle}>Localidad</label>
                   <input value={localidad} onChange={e => setLocalidad(e.target.value)} placeholder="Ej: Córdoba Capital" style={inpStyle} />
@@ -189,7 +189,7 @@ function HospitalesExternos() {
 
 // ── Estilos compartidos ──
 const thStyle = { fontSize: 11, fontWeight: 500, color: '#6B7C8C', padding: '12px 8px', borderBottom: '1px solid #F1F4F7', textTransform: 'uppercase', letterSpacing: '0.4px', textAlign: 'left' };
-const tdStyle = { padding: '14px 8px', fontSize: 13, color: '#2D3748' };
+const tdStyle = { padding: '14px 8px', fontSize: 13, color: '#2D3748', whiteSpace: 'nowrap' };
 const lblStyle = { display: 'block', fontSize: 11, fontWeight: 600, color: '#4A5868', marginBottom: 6 };
 const inpStyle = { width: '100%', padding: '10px 12px', border: '1.5px solid #E5EDF3', borderRadius: 8, fontSize: 13, background: '#FAFBFC', outline: 'none', boxSizing: 'border-box' };
 const errStyle = { display: 'block', color: '#E85A6D', fontSize: 11, marginTop: 6, fontWeight: 500 };

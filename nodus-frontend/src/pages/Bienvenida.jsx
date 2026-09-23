@@ -51,7 +51,7 @@ function Bienvenida({ auth }) {
   }, [equipos, ots]);
 
   return (
-    <div style={{
+    <div className="rwd-page-header" style={{
       background: 'linear-gradient(135deg, #FAFBFC 0%, #F4F7FA 100%)',
       minHeight: '100vh',
       display: 'flex',

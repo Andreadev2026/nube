@@ -276,7 +276,7 @@ function BajasPatrimoniales() {
   return (
     <>
       {/* ── HEADER ── */}
-      <div style={{ padding: '20px 24px 0', background: 'white' }}>
+      <div className="rwd-page-header" style={{ padding: '20px 24px 0', background: 'white' }}>
         <div style={{
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
           marginBottom: 4, flexWrap: 'wrap', gap: 12
@@ -364,8 +364,8 @@ function BajasPatrimoniales() {
       </div>
 
       {/* ── TABLA ── */}
-      <div style={{ padding: '20px 24px', background: 'white' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+      <div className="rwd-table-wrap" style={{ padding: '20px 24px', background: 'white', overflowX: 'auto' }}>
+        <table className="rwd-table" style={{ width: '100%', borderCollapse: 'collapse', minWidth: 700 }}>
           <thead>
             <tr style={{ textAlign: 'left' }}>
               <th style={thStyle}>Fecha</th>
@@ -425,6 +425,7 @@ function BajasPatrimoniales() {
       {modalAbierto && (
         <div
           onClick={cerrarModal}
+          className="rwd-modal-overlay"
           style={{
             position:'fixed', top:0, left:0, right:0, bottom:0,
             background:'rgba(20,25,40,0.6)', backdropFilter: 'blur(4px)',
@@ -434,6 +435,7 @@ function BajasPatrimoniales() {
         >
           <div
             onClick={(e) => e.stopPropagation()}
+            className="rwd-modal-box"
             style={{
               background:'white', borderRadius:16,
               maxWidth:720, width:'100%', maxHeight:'92vh',
@@ -623,7 +625,7 @@ function BajasPatrimoniales() {
               <div style={{ marginTop: 22 }}>
                 <SeccionTitulo icono="📋" titulo="Responsabilidad y fecha" />
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 22 }}>
+                <div className="rwd-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 22 }}>
                   <div>
                     <label style={lblStyle}>Fecha de baja *</label>
                     <DatePicker
@@ -815,7 +817,7 @@ const thStyle = {
   textTransform: 'uppercase', letterSpacing: '0.4px'
 };
 const tdStyle = {
-  padding: '14px 8px', fontSize: 13, color: '#2D3748'
+  padding: '14px 8px', fontSize: 13, color: '#2D3748', whiteSpace: 'nowrap'
 };
 const lblStyle = {
   display:'block', fontSize:11, fontWeight:600, color:'#4A5868',

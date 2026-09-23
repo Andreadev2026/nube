@@ -123,7 +123,7 @@ function Sectores() {
                 <tr key={s.idSector}>
                   <td className="td-id">#{s.idSector}</td>
                   <td><strong>{s.nombre}</strong></td>
-                  <td>{s.descripcion || '—'}</td>
+                  <td className="wrap-cell">{s.descripcion || '—'}</td>
                   <td>
                     <span
                       className="estado-chip"

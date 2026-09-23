@@ -648,7 +648,7 @@ function Reportes() {
   }
 
   return (
-    <div style={{ padding: '20px 24px', background: '#FAFBFC', minHeight: '100vh' }}>
+    <div className="rwd-page-header" style={{ padding: '20px 24px', background: '#FAFBFC', minHeight: '100vh' }}>
 
       {/* ── HEADER ── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12, marginBottom: 20 }}>
@@ -710,7 +710,7 @@ function Reportes() {
                 </div>
 
                 {/* Rango personalizado */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
+                <div className="rwd-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
                   <div>
                     <label style={lblFiltro}>Desde</label>
                     <DatePicker
@@ -769,7 +769,7 @@ function Reportes() {
 
             {/* ══ SECCIÓN: Gestión Patrimonial ══ */}
             <SeccionTitulo titulo="Gestión Patrimonial" />
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.4fr', gap: 14, marginBottom: 28 }}>
+            <div className="rwd-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.4fr', gap: 14, marginBottom: 28 }}>
               <KPICardSpark icono="📦" iconoBg="#E6F1FB" label="Total de activos" valor={totalActivos}
                 sub={`${totalActivos > 0 ? 100 : 0}% del total`} subColor="#6B7C8C" color={AZUL_MEDIO} sparkData={sparkTotalActivos} />
               <KPICardSpark icono="✅" iconoBg="#E1F5EE" label="Activos operativos" valor={activosOperativos}
@@ -779,20 +779,20 @@ function Reportes() {
 
             {/* ══ SECCIÓN: Gestión de Mantenimiento ══ */}
             <SeccionTitulo titulo="Gestión de Mantenimiento" />
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+            <div className="rwd-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
               <KPICardSpark icono="🔧" iconoBg="#FAEEDA" label="Órdenes de trabajo" valor={totalOTs}
                 sub={deltaOTs === null ? '—' : `${deltaOTs >= 0 ? '+' : ''}${deltaOTs}% vs período anterior`} subColor={deltaOTs >= 0 ? VERDE : ROJO} color={NARANJA} sparkData={sparkOTs} />
               <KPICardSpark icono="⏳" iconoBg="#FDECEE" label="OT pendientes" valor={otPendientes}
                 sub={deltaPendientes === null ? '—' : `${deltaPendientes >= 0 ? '+' : ''}${deltaPendientes}% vs período anterior`} subColor={deltaPendientes <= 0 ? VERDE : ROJO} color={ROJO} sparkData={sparkPendientes} />
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '0.8fr 1.2fr', gap: 14, marginBottom: 28 }}>
+            <div className="rwd-grid" style={{ display: 'grid', gridTemplateColumns: '0.8fr 1.2fr', gap: 14, marginBottom: 28 }}>
               <DonutConLeyenda titulo="Tipo de mantenimiento" data={dataTipoMantenimiento} colores={COLORES_TIPO} total={totalOTs} />
               <TablaRanking titulo="Activos con más intervenciones" filas={activosMasIntervenciones} colNombre="Activo" colValor="Intervenciones" onVerTodos={() => navigate('/ordenestrabajo')} />
             </div>
 
             {/* ══ SECCIÓN: Gestión de Préstamos ══ */}
             <SeccionTitulo titulo="Gestión de Préstamos" />
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 28 }}>
+            <div className="rwd-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 28 }}>
               <KPICardSpark icono="🤝" iconoBg="#E6F1FB" label="Préstamos activos" valor={prestamosActivos.length}
                 sub="En curso actualmente" subColor="#6B7C8C" color={AZUL_MEDIO} sparkData={sparkPrestamosActivos} />
               <KPICardSpark icono="⏰" iconoBg="#FAECE7" label="Préstamos vencidos" valor={prestamosVencidos.length}
@@ -802,7 +802,7 @@ function Reportes() {
 
             {/* ══ SECCIÓN: Gestión de Insumos ══ */}
             <SeccionTitulo titulo="Gestión de Insumos" />
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 16 }}>
+            <div className="rwd-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 16 }}>
               <TablaRanking titulo="Insumos más utilizados" filas={insumosMasUtilizados} colNombre="Insumo" colValor="Cantidad" onVerTodos={() => navigate('/insumos')} />
 
               <div style={cardStyle}>
@@ -887,8 +887,8 @@ function Reportes() {
               </div>
             </div>
 
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+            <div className="rwd-table-wrap" style={{ overflowX: 'auto' }}>
+              <table className="rwd-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, minWidth: Math.max(600, CONFIG_LISTADOS[listadoTipo].columnas.length * 130) }}>
                 <thead>
                   <tr>
                     {CONFIG_LISTADOS[listadoTipo].columnas.map((col, i) => (

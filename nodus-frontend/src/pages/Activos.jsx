@@ -88,6 +88,7 @@ function Activos() {
   const [busqueda, setBusqueda] = useState('');
   const [busquedaAbierta, setBusquedaAbierta] = useState(false);
   const [modalAlertasEquipo, setModalAlertasEquipo] = useState(null);
+  const [modalQrEquipo, setModalQrEquipo] = useState(null);
 
   useEffect(() => {
     cargarEquipos(); cargarMarcas(); cargarTipos(); cargarEstados(); cargarAlertas();
@@ -410,7 +411,7 @@ function Activos() {
   return (
     <>
       {/* ── HEADER ── */}
-      <div style={{ padding: '20px 24px 0', background: 'white' }}>
+      <div className="rwd-page-header" style={{ padding: '20px 24px 0', background: 'white' }}>
         <div style={{
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
           marginBottom: 4, flexWrap: 'wrap', gap: 12
@@ -496,8 +497,8 @@ function Activos() {
       </div>
 
       {/* ── TABLA ── */}
-      <div style={{ padding: '20px 24px', background: 'white' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+      <div className="rwd-table-wrap" style={{ padding: '20px 24px', background: 'white', overflowX: 'auto' }}>
+        <table className="rwd-table" style={{ width: '100%', borderCollapse: 'collapse', minWidth: 700 }}>
           <thead>
             <tr style={{ textAlign: 'left' }}>
               <th style={thStyle}>Marca</th>
@@ -550,6 +551,7 @@ function Activos() {
                   </td>
                   <td style={tdStyle}>
                     <button className="btn-edit" onClick={() => abrirModalEditar(eq)}>✏</button>
+                    <button className="btn-edit" onClick={() => setModalQrEquipo(eq)} title="Ver / imprimir codigo QR" style={{ marginLeft: 6 }}>QR</button>
                   </td>
                 </tr>
               );
@@ -570,6 +572,7 @@ function Activos() {
       {modalAbierto && (
         <div
           onClick={cerrarModal}
+          className="rwd-modal-overlay"
           style={{
             position:'fixed', top:0, left:0, right:0, bottom:0,
             background:'rgba(20,25,40,0.6)', backdropFilter: 'blur(4px)',
@@ -579,6 +582,7 @@ function Activos() {
         >
           <div
             onClick={(e) => e.stopPropagation()}
+            className="rwd-modal-box"
             style={{
               background:'white', borderRadius:16,
               maxWidth:850, width:'100%', maxHeight:'92vh',
@@ -643,7 +647,7 @@ function Activos() {
 
               {/* ═══ SECCIÓN 1: IDENTIFICACIÓN ═══ */}
               <SeccionTitulo icono="📋" titulo="Identificación del equipo" />
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 22 }}>
+              <div className="rwd-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 22 }}>
                 <div>
                   <label style={lblStyle}>Modelo *</label>
                   <input
@@ -847,6 +851,7 @@ function Activos() {
               {/* ═══ SECCIÓN 2: FECHAS ═══ */}
               <SeccionTitulo icono="📅" titulo="Fechas de trazabilidad" />
               <div
+                className="rwd-grid"
                 style={{
                   display: 'grid',
                   gridTemplateColumns: 'repeat(2, minmax(340px, 1fr))',
@@ -1067,6 +1072,7 @@ function Activos() {
       {modalAlertasEquipo && (
         <div
           onClick={() => setModalAlertasEquipo(null)}
+          className="rwd-modal-overlay"
           style={{
             position:'fixed', top:0, left:0, right:0, bottom:0,
             background:'rgba(0,0,0,0.5)', display:'flex',
@@ -1075,6 +1081,7 @@ function Activos() {
         >
           <div
             onClick={(e) => e.stopPropagation()}
+            className="rwd-modal-box"
             style={{
               background:'white', borderRadius:12, padding:24,
               maxWidth:600, width:'100%', maxHeight:'90vh',
@@ -1120,11 +1127,57 @@ function Activos() {
         </div>
       )}
 
+      {/* ── MODAL: CODIGO QR ── */}
+      {modalQrEquipo && (
+        <div
+          onClick={() => setModalQrEquipo(null)}
+          className="rwd-modal-overlay"
+          style={{
+            position:'fixed', top:0, left:0, right:0, bottom:0,
+            background:'rgba(0,0,0,0.5)', display:'flex',
+            alignItems:'center', justifyContent:'center', zIndex:1001, padding:20
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="rwd-modal-box"
+            style={{
+              background:'white', borderRadius:12, padding:24,
+              maxWidth:400, width:'100%', maxHeight:'90vh',
+              overflowY:'auto', boxShadow:'0 10px 40px rgba(0,0,0,0.2)'
+            }}
+          >
+            <div id="qr-imprimible" style={{ textAlign: 'center' }}>
+              <div style={{ marginBottom: 14 }}>
+                <strong style={{ fontSize: 15, color: '#1a1a1a' }}>{modalQrEquipo.modelo}</strong>
+                <div style={{ fontSize: 13, color: '#6B7C8C', marginTop: 2 }}>S/N {modalQrEquipo.nroSerie}</div>
+              </div>
+              <img
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(`${window.location.origin}/ficha/${modalQrEquipo.idEquipo}`)}`}
+                alt={`Codigo QR de ${modalQrEquipo.modelo}`}
+                style={{ width: 260, height: 260, margin: '0 auto' }}
+              />
+            </div>
+            <div className="no-print" style={{ display:'flex', justifyContent:'flex-end', gap:10, marginTop:18, paddingTop:14, borderTop:'1px solid #eee' }}>
+              <button onClick={() => setModalQrEquipo(null)} style={btnGhost}>Cerrar</button>
+              <button onClick={() => window.print()} style={btnSave}>Imprimir</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Animación + estilos del calendario */}
       <style>{`
         @keyframes slideIn {
           from { opacity: 0; transform: translateY(-20px) scale(0.98); }
           to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        @media print {
+          body * { visibility: hidden; }
+          #qr-imprimible, #qr-imprimible * { visibility: visible; }
+          #qr-imprimible { position: fixed; top: 40px; left: 50%; transform: translateX(-50%); box-shadow: none; }
+          .no-print { display: none !important; }
         }
 
         .react-datepicker-wrapper {
@@ -1255,7 +1308,7 @@ const thStyle = {
   textTransform: 'uppercase', letterSpacing: '0.4px'
 };
 const tdStyle = {
-  padding: '14px 8px', fontSize: 13, color: '#2D3748'
+  padding: '14px 8px', fontSize: 13, color: '#2D3748', whiteSpace: 'nowrap'
 };
 const lblStyle = {
   display:'block', fontSize:11, fontWeight:600, color:'#4A5868',

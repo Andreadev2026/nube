@@ -4,7 +4,7 @@ body { font-family: 'Segoe UI', sans-serif; background: #F4F7FA; color: #2D3748;
 /* ── LOGIN ── */
 .login-page {
   min-height: 100vh; display: flex; align-items: center; justify-content: center;
-  background: #E5E7EB;
+  background: #E5E7EB; padding: 16px;
 }
 .login-card {
   background: #FFFFFF; border: 1px solid #D6E2EC; border-radius: 16px;
@@ -29,7 +29,11 @@ body { font-family: 'Segoe UI', sans-serif; background: #F4F7FA; color: #2D3748;
 
 /* ── LAYOUT GENERAL ── */
 .app { display: flex; min-height: 100vh; }
-.content { flex: 1; display: flex; flex-direction: column; overflow-y: auto; overflow-x: auto; }
+.content {
+  flex: 1; display: flex; flex-direction: column;
+  overflow-y: auto; overflow-x: auto;
+  min-width: 0; /* evita que .content (item flex de .app) crezca al ancho de su contenido y empuje el layout */
+}
 
 /* ── TOPBAR ── */
 .topbar {
@@ -44,7 +48,10 @@ body { font-family: 'Segoe UI', sans-serif; background: #F4F7FA; color: #2D3748;
 .desc { font-size: 0.8rem; color: #6B7C8C; margin-left: auto; }
 
 /* ── PAGE CONTENT ── */
-.page-content { padding: 20px 24px; flex: 1; }
+.page-content {
+  padding: 20px 24px; flex: 1;
+  min-width: 0; /* es flex-item de .content (flex-column): sin esto no se achica por debajo de .table-card */
+}
 
 /* ── FORM ── */
 .form-card {
@@ -54,6 +61,9 @@ body { font-family: 'Segoe UI', sans-serif; background: #F4F7FA; color: #2D3748;
 }
 .form-card h3 { font-size: 0.95rem; color: #2C7DA0; margin-bottom: 14px; }
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 768px) {
+  .form-grid { grid-template-columns: 1fr !important; }
+}
 .form-group { display: flex; flex-direction: column; gap: 4px; }
 .form-group.full { grid-column: 1 / -1; }
 .form-group label {
@@ -84,6 +94,7 @@ body { font-family: 'Segoe UI', sans-serif; background: #F4F7FA; color: #2D3748;
 /* ── TABLE ── */
 .table-card {
   background: #FFFFFF; border: 1px solid #D6E2EC; border-radius: 10px; overflow-x: auto;
+  max-width: 100%;
   box-shadow: 0 1px 3px rgba(44, 125, 160, 0.05);
 }
 .table-card table { min-width: 1000px; }
@@ -98,6 +109,8 @@ tbody tr { border-bottom: 1px solid #E5EDF3; }
 tbody tr:last-child { border-bottom: none; }
 tbody tr:hover { background: #F7FAFC; }
 tbody td { padding: 9px 12px; color: #2D3748; }
+.table-card th, .table-card td { white-space: nowrap; }
+.table-card td.wrap-cell { white-space: normal; max-width: 280px; }
 .td-id { color: #C77800; font-family: monospace; font-size: 0.8rem; }
 .td-mono { font-family: monospace; font-size: 0.78rem; color: #4A5868; }
 .empty { text-align: center; color: #6B7C8C; padding: 32px !important; }
@@ -361,4 +374,135 @@ tbody td { padding: 9px 12px; color: #2D3748; }
   from { opacity: 0; transform: translateY(-4px); }
   to { opacity: 1; transform: translateY(0); }
 }
-  
+
+/* ============================================================ */
+/* RESPONSIVE - Mobile & tablet (menu hamburguesa, overlay)     */
+/* ============================================================ */
+
+/* Botón hamburguesa: oculto en desktop, visible solo en mobile */
+.sn-hamburger {
+  display: none;
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  z-index: 1101;
+  width: 40px;
+  height: 40px;
+  align-items: center;
+  justify-content: center;
+  background: #2E6BE6;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+}
+
+/* Overlay oscuro detrás del sidebar cuando está abierto en mobile */
+.sn-overlay {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .sn-hamburger {
+    display: flex;
+  }
+
+  .sn-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(20, 25, 40, 0.5);
+    z-index: 1099;
+  }
+
+  .sidebar-nodus {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    z-index: 1100;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    box-shadow: 2px 0 16px rgba(0, 0, 0, 0.25);
+  }
+
+  .sidebar-nodus.sn-open {
+    transform: translateX(0);
+  }
+
+  .app {
+    display: block;
+  }
+
+  .content {
+    width: 100%;
+    min-width: 0;
+    /* .content deja de ser flex-item de .app en mobile (.app pasa a block),
+       pero sigue siendo flex-column para sus propios hijos (header, tabla, etc).
+       Si esos hijos no pueden encogerse, .content termina siendo el que scrollea
+       horizontalmente (arrastrando header y botones). Lo bloqueamos acá: el único
+       scroll horizontal permitido debe originarse en .rwd-table-wrap. */
+    overflow-x: hidden;
+  }
+
+  .topbar {
+    padding-left: 60px;
+    flex-wrap: wrap;
+  }
+
+  .desc {
+    margin-left: 0;
+    flex-basis: 100%;
+  }
+
+  .page-content {
+    padding: 16px;
+  }
+
+  /* Grillas de tarjetas/formularios: una sola columna en mobile */
+  .rwd-grid {
+    grid-template-columns: 1fr !important;
+    min-width: 0;
+  }
+  /* Los ítems de una grilla/flex heredan min-width:auto por defecto y no
+     se dejan achicar por debajo del contenido; sin esto empujan el layout
+     en vez de dejar que el descendiente con overflow-x:auto haga su scroll */
+  .rwd-grid > * {
+    min-width: 0;
+  }
+
+  /* Modales: casi toda la pantalla, sin maxWidth fijo */
+  .rwd-modal-overlay {
+    padding: 8px !important;
+  }
+
+  .rwd-modal-box {
+    width: 95vw !important;
+    max-width: 95vw !important;
+  }
+
+  /* Tablas con scroll horizontal en vez de romper el layout */
+  .table-card table {
+    min-width: 700px;
+  }
+
+  /* Encabezados de página con estilo propio (fuera de .topbar): dejar
+     lugar suficiente para que el botón hamburguesa fijo no los tape */
+  .rwd-page-header {
+    padding-top: 64px !important;
+    min-width: 0; /* es hijo flex de .content: sin esto, su ancho de contenido puede empujar todo el layout */
+  }
+
+  /* Contenedores de tabla con overflow-x inline: asegurar scroll prolijo
+     y CONTENIDO dentro de .content, sin arrastrar el resto de la página */
+  .rwd-table-wrap {
+    -webkit-overflow-scrolling: touch;
+    min-width: 0;   /* que pueda encogerse por debajo del min-width de la tabla */
+    max-width: 100%; /* que nunca exceda el ancho disponible de .content */
+  }
+  .rwd-table th,
+  .rwd-table td {
+    white-space: nowrap;
+  }
+}

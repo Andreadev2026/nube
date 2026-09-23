@@ -309,7 +309,7 @@ function Intervenciones() {
   return (
     <>
       {/* ── HEADER ── */}
-      <div style={{ padding: '20px 24px 0', background: 'white' }}>
+      <div className="rwd-page-header" style={{ padding: '20px 24px 0', background: 'white' }}>
         <div style={{
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
           marginBottom: 18, flexWrap: 'wrap', gap: 12
@@ -348,7 +348,7 @@ function Intervenciones() {
       </div>
 
       {/* ── PANEL MAESTRO-DETALLE ── */}
-      <div style={{
+      <div className="rwd-grid" style={{
         display: 'grid', gridTemplateColumns: '340px 1fr',
         gap: 0, background: 'white',
         minHeight: 600, borderTop: '1px solid #E5EDF3'
@@ -536,6 +536,7 @@ function Intervenciones() {
       {modalAbierto && (
         <div
           onClick={cerrarModal}
+          className="rwd-modal-overlay"
           style={{
             position:'fixed', top:0, left:0, right:0, bottom:0,
             background:'rgba(20,25,40,0.6)', backdropFilter: 'blur(4px)',
@@ -545,6 +546,7 @@ function Intervenciones() {
         >
           <div
             onClick={(e) => e.stopPropagation()}
+            className="rwd-modal-box"
             style={{
               background:'white', borderRadius:16,
               maxWidth:720, width:'100%', maxHeight:'92vh',
@@ -707,7 +709,7 @@ function Intervenciones() {
 
               {/* SECCIÓN 2: DATOS DE LA INTERVENCIÓN */}
               <SeccionTitulo icono="📋" titulo="Datos de la intervención" />
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 22 }}>
+              <div className="rwd-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 22 }}>
                 <div>
              <label style={lblStyle}>Fecha *</label>
                   <DatePicker

@@ -155,7 +155,7 @@ function Alertas({ auth }) {
 
       <div className="page-content">
         {/* KPIs */}
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:16, marginBottom:20 }}>
+        <div className="rwd-grid" style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:16, marginBottom:20 }}>
           <div style={{ background:'rgba(124,110,250,0.08)', border:'1px solid rgba(124,110,250,0.2)', borderRadius:12, padding:16 }}>
             <div style={{ color:'#9E9CBB', fontSize:12, fontWeight:600, marginBottom:4 }}>TOTAL</div>
             <div style={{ color:'#A89BFF', fontSize:28, fontWeight:700 }}>{kpiTotal}</div>
