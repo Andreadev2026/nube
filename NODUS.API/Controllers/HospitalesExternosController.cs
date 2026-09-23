@@ -1,6 +1,7 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using NODUS.API.DTOs;
+using NODUS.API.Services;
 using NODUS.Data;
 using NODUS.Models;
 
@@ -11,31 +12,36 @@ namespace NODUS.API.Controllers
     public class HospitalesExternosController : ControllerBase
     {
         private readonly NodusDbContext _db;
+        private readonly GeocodingService _geocoding;
 
-        public HospitalesExternosController(NodusDbContext db)
+        public HospitalesExternosController(NodusDbContext db, GeocodingService geocoding)
         {
             _db = db;
+            _geocoding = geocoding;
         }
+
+        private static HospitalExternoDto ToDto(HospitalExterno h) => new HospitalExternoDto
+        {
+            IdHospital = h.IdHospital,
+            Nombre = h.Nombre,
+            Localidad = h.Localidad,
+            Direccion = h.Direccion,
+            Contacto = h.Contacto,
+            Telefono = h.Telefono,
+            Email = h.Email,
+            Latitud = h.Latitud,
+            Longitud = h.Longitud,
+            Activo = h.Activo
+        };
 
         [HttpGet]
         public async Task<ActionResult<IEnumerable<HospitalExternoDto>>> GetHospitales()
         {
             var hospitales = await _db.HospitalesExternos
                 .OrderBy(h => h.Nombre)
-                .Select(h => new HospitalExternoDto
-                {
-                    IdHospital = h.IdHospital,
-                    Nombre = h.Nombre,
-                    Localidad = h.Localidad,
-                    Direccion = h.Direccion,
-                    Contacto = h.Contacto,
-                    Telefono = h.Telefono,
-                    Email = h.Email,
-                    Activo = h.Activo
-                })
                 .ToListAsync();
 
-            return Ok(hospitales);
+            return Ok(hospitales.Select(ToDto));
         }
 
         [HttpGet("{id}")]
@@ -44,17 +50,7 @@ namespace NODUS.API.Controllers
             var h = await _db.HospitalesExternos.FindAsync(id);
             if (h == null) return NotFound();
 
-            return Ok(new HospitalExternoDto
-            {
-                IdHospital = h.IdHospital,
-                Nombre = h.Nombre,
-                Localidad = h.Localidad,
-                Direccion = h.Direccion,
-                Contacto = h.Contacto,
-                Telefono = h.Telefono,
-                Email = h.Email,
-                Activo = h.Activo
-            });
+            return Ok(ToDto(h));
         }
 
         [HttpPost]
@@ -76,15 +72,83 @@ namespace NODUS.API.Controllers
             if (string.IsNullOrWhiteSpace(hospital.Nombre))
                 return BadRequest("El nombre del hospital es obligatorio.");
 
-            _db.Entry(hospital).State = EntityState.Modified;
+            var existente = await _db.HospitalesExternos.FindAsync(id);
+            if (existente == null) return NotFound();
 
-            try { await _db.SaveChangesAsync(); }
-            catch (DbUpdateConcurrencyException)
+            // Si cambia la ubicación, las coordenadas viejas dejan de ser válidas y hay que volver a geocodificar
+            var cambioUbicacion = existente.Direccion != hospital.Direccion || existente.Localidad != hospital.Localidad;
+
+            existente.Nombre = hospital.Nombre;
+            existente.Localidad = hospital.Localidad;
+            existente.Direccion = hospital.Direccion;
+            existente.Contacto = hospital.Contacto;
+            existente.Telefono = hospital.Telefono;
+            existente.Email = hospital.Email;
+            existente.Activo = hospital.Activo;
+
+            if (cambioUbicacion)
             {
-                if (!_db.HospitalesExternos.Any(h => h.IdHospital == id)) return NotFound();
-                throw;
+                existente.Latitud = null;
+                existente.Longitud = null;
             }
+
+            await _db.SaveChangesAsync();
             return NoContent();
+        }
+
+        [HttpPut("{id}/coordenadas")]
+        public async Task<IActionResult> PutCoordenadas(int id, CoordenadasInputDto input)
+        {
+            if (input.Latitud is < -90 or > 90 || input.Longitud is < -180 or > 180)
+                return BadRequest("Coordenadas fuera de rango.");
+
+            var hospital = await _db.HospitalesExternos.FindAsync(id);
+            if (hospital == null) return NotFound();
+
+            hospital.Latitud = input.Latitud;
+            hospital.Longitud = input.Longitud;
+            await _db.SaveChangesAsync();
+            return NoContent();
+        }
+
+        /// <summary>
+        /// Recorre los hospitales sin coordenadas y los geocodifica con Nominatim (1 request/seg).
+        /// Los que no dan resultado quedan en null y se devuelven para carga manual.
+        /// </summary>
+        [HttpPost("geocodificar")]
+        public async Task<ActionResult<GeocodificacionResultadoDto>> Geocodificar(CancellationToken ct)
+        {
+            var pendientes = await _db.HospitalesExternos
+                .Where(h => h.Activo && (h.Latitud == null || h.Longitud == null))
+                .OrderBy(h => h.IdHospital)
+                .ToListAsync(ct);
+
+            var resultado = new GeocodificacionResultadoDto();
+
+            foreach (var h in pendientes)
+            {
+                var r = await _geocoding.GeocodificarHospitalAsync(h, ct);
+                var item = new GeocodificacionItemDto { IdHospital = h.IdHospital, Nombre = h.Nombre, Direccion = h.Direccion };
+
+                if (r == null)
+                {
+                    resultado.SinResultado.Add(item);
+                    continue;
+                }
+
+                h.Latitud = r.Latitud;
+                h.Longitud = r.Longitud;
+                // Guardamos de a uno para no perder lo avanzado si se corta el proceso
+                await _db.SaveChangesAsync(ct);
+
+                item.Latitud = r.Latitud;
+                item.Longitud = r.Longitud;
+                item.Fuente = r.Fuente;
+                item.Encontrado = r.DisplayName;
+                resultado.Geocodificados.Add(item);
+            }
+
+            return Ok(resultado);
         }
 
         [HttpDelete("{id}")]

@@ -9,6 +9,8 @@
         public string? Contacto { get; set; }
         public string? Telefono { get; set; }
         public string? Email { get; set; }
+        public double? Latitud { get; set; }
+        public double? Longitud { get; set; }
         public bool Activo { get; set; } = true;
 
         public ICollection<Prestamo> Prestamos { get; set; } = new List<Prestamo>();

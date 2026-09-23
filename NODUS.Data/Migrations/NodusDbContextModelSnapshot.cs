@@ -17,7 +17,7 @@ namespace NODUS.Data.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.4")
+                .HasAnnotation("ProductVersion", "10.0.0")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -324,10 +324,18 @@ namespace NODUS.Data.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("email");
 
+                    b.Property<double?>("Latitud")
+                        .HasColumnType("double precision")
+                        .HasColumnName("latitud");
+
                     b.Property<string>("Localidad")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")
                         .HasColumnName("localidad");
+
+                    b.Property<double?>("Longitud")
+                        .HasColumnType("double precision")
+                        .HasColumnName("longitud");
 
                     b.Property<string>("Nombre")
                         .IsRequired()

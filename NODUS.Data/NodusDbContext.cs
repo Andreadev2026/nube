@@ -135,6 +135,8 @@ namespace NODUS.Data
                 e.Property(x => x.Contacto).HasColumnName("contacto").HasMaxLength(100);
                 e.Property(x => x.Telefono).HasColumnName("telefono").HasMaxLength(50);
                 e.Property(x => x.Email).HasColumnName("email").HasMaxLength(100);
+                e.Property(x => x.Latitud).HasColumnName("latitud");
+                e.Property(x => x.Longitud).HasColumnName("longitud");
                 e.Property(x => x.Activo).HasColumnName("activo").IsRequired();
             });
 

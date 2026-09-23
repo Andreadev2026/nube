@@ -19,6 +19,7 @@ import {
   IconList,
   IconArrowsExchange,
   IconBuildingHospital,
+  IconMap2,
   IconMenu2,
   IconX
 } from '@tabler/icons-react';
@@ -42,6 +43,7 @@ import Bienvenida from './pages/Bienvenida';
 import Reportes from './pages/Reportes';
 import Prestamos from './pages/Prestamos';
 import HospitalesExternos from './pages/HospitalesExternos';
+import MapaPrestamos from './pages/MapaPrestamos';
 import FichaEquipo from './pages/FichaEquipo';
 import './App.css';
 
@@ -65,6 +67,7 @@ function Sidebar({ auth, onLogout, mobileOpen, onNavigate }) {
     '/reportes/listados': 'reportes',
     '/prestamos': 'prestamos',
     '/hospitalesexternos': 'prestamos',
+    '/mapaprestamos': 'prestamos',
     '/usuarios': 'admin'
   };
 
@@ -216,6 +219,10 @@ function Sidebar({ auth, onLogout, mobileOpen, onNavigate }) {
                   <IconBuildingHospital size={16} stroke={2} />
                   <span>Hospitales externos</span>
                 </NavLink>
+                <NavLink to="/mapaprestamos" className="sn-item">
+                  <IconMap2 size={16} stroke={2} />
+                  <span>Mapa de préstamos</span>
+                </NavLink>
               </div>
             )}
           </>
@@ -343,6 +350,7 @@ function App() {
             <Route path="/usuarios" element={<RutaProtegida auth={auth} modulo="administracion"><Usuarios /></RutaProtegida>} />
             <Route path="/prestamos" element={<RutaProtegida auth={auth} modulo="prestamos"><Prestamos auth={auth} /></RutaProtegida>} />
             <Route path="/hospitalesexternos" element={<RutaProtegida auth={auth} modulo="prestamos"><HospitalesExternos /></RutaProtegida>} />
+            <Route path="/mapaprestamos" element={<RutaProtegida auth={auth} modulo="prestamos"><MapaPrestamos /></RutaProtegida>} />
             <Route path="*" element={<Navigate to="/" />} />
             <Route path="/reportes" element={<RutaProtegida auth={auth} modulo="reportes"><Reportes /></RutaProtegida>} />
             <Route path="/reportes/listados" element={<RutaProtegida auth={auth} modulo="reportes"><Reportes /></RutaProtegida>} />

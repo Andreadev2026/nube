@@ -48,6 +48,8 @@ namespace NODUS.API.Controllers
                 Contacto = p.Hospital.Contacto,
                 Telefono = p.Hospital.Telefono,
                 Email = p.Hospital.Email,
+                Latitud = p.Hospital.Latitud,
+                Longitud = p.Hospital.Longitud,
                 Activo = p.Hospital.Activo
             },
             Usuario = p.Usuario == null ? null : new UsuarioResumenDto
@@ -70,6 +72,39 @@ namespace NODUS.API.Controllers
                 .ToListAsync();
 
             return Ok(prestamos.Select(ToDto));
+        }
+
+        [HttpGet("mapa")]
+        public async Task<ActionResult<IEnumerable<PrestamoMapaDto>>> GetMapa()
+        {
+            var activos = await _db.Prestamos
+                .Where(p => p.FechaDevolucionReal == null && p.Estado != "Devuelto")
+                .OrderBy(p => p.FechaPrestamo)
+                .Select(p => new PrestamoMapaDto
+                {
+                    IdPrestamo = p.IdPrestamo,
+                    FechaPrestamo = p.FechaPrestamo,
+                    FechaEstimadaDevolucion = p.FechaEstimadaDevolucion,
+                    Motivo = p.Motivo,
+                    IdEquipo = p.IdEquipo,
+                    Modelo = p.Equipo!.Modelo,
+                    NroSerie = p.Equipo.NroSerie,
+                    Marca = p.Equipo.Marca!.Nombre,
+                    TipoActivo = p.Equipo.TipoActivo!.Nombre,
+                    Componentes = p.PrestamoComponentes.Select(c => c.Componente).ToList(),
+                    IdHospital = p.IdHospital,
+                    Hospital = p.Hospital!.Nombre,
+                    Direccion = p.Hospital.Direccion,
+                    Localidad = p.Hospital.Localidad,
+                    Latitud = p.Hospital.Latitud,
+                    Longitud = p.Hospital.Longitud,
+                    Contacto = p.Hospital.Contacto,
+                    Telefono = p.Hospital.Telefono,
+                    Responsable = p.Usuario!.Nombre
+                })
+                .ToListAsync();
+
+            return Ok(activos);
         }
 
         [HttpGet("{id}")]

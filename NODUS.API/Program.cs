@@ -2,6 +2,7 @@ using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using NODUS.API.Services;
 using NODUS.Data;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -25,6 +26,15 @@ builder.Services.AddSwaggerGen(c =>
 
 builder.Services.AddDbContext<NodusDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("NodusDB")));
+
+// Nominatim exige un User-Agent que identifique a la aplicación
+builder.Services.AddHttpClient<GeocodingService>(client =>
+{
+    client.BaseAddress = new Uri("https://nominatim.openstreetmap.org/");
+    client.DefaultRequestHeaders.UserAgent.ParseAdd("NODUS-GestionPrestamos/1.0");
+    client.DefaultRequestHeaders.AcceptLanguage.ParseAdd("es");
+    client.Timeout = TimeSpan.FromSeconds(15);
+});
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
