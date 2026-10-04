@@ -20,6 +20,9 @@
 
         // Nombres de los componentes tildados en el checklist del frontend
         public List<string> Componentes { get; set; } = new();
+
+        // Hospital si está prestado; si no, sector del último traslado. Null si no hay ninguno registrado
+        public string? UbicacionActual { get; set; }
     }
 
     public class MarcaDto

@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api';
+import { DIAS_AVISO_GARANTIA, garantiaPorVencer } from '../vencimientos';
 
 function Bienvenida({ auth }) {
   const navigate = useNavigate();
@@ -9,8 +10,6 @@ function Bienvenida({ auth }) {
   const [equipos, setEquipos] = useState([]);
   const [ots, setOts] = useState([]);
   const [cargando, setCargando] = useState(true);
-
-  const hoy = new Date();
 
   useEffect(() => {
     cargarTodo();
@@ -39,13 +38,8 @@ function Bienvenida({ auth }) {
       o.estado === 'Pendiente' || o.estado === 'En curso'
     ).length;
 
-    const en90Dias = new Date();
-    en90Dias.setDate(en90Dias.getDate() + 90);
-    const garantiasPorVencer = equipos.filter(e => {
-      if (!e.vencimientoGarantia) return false;
-      const vg = new Date(e.vencimientoGarantia);
-      return vg > hoy && vg <= en90Dias;
-    }).length;
+    // Mismo criterio que Activos y el menú lateral (vencimientos.js)
+    const garantiasPorVencer = equipos.filter(garantiaPorVencer).length;
 
     return { totalActivos, otsPendientes, garantiasPorVencer };
   }, [equipos, ots]);
@@ -139,7 +133,7 @@ function Bienvenida({ auth }) {
           icono="🛡"
           label="Garantías por vencer"
           valor={cargando ? '—' : kpis.garantiasPorVencer}
-          descripcion="Próximos 90 días"
+          descripcion={`Próximos ${DIAS_AVISO_GARANTIA} días`}
           gradient="linear-gradient(135deg, #FAEEDA 0%, #F0DBAF 100%)"
           colorValor="#7A5410"
           onClick={() => navigate('/activos')}

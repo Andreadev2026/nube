@@ -1,5 +1,9 @@
-import { useState, useEffect, useMemo, forwardRef } from 'react';
+import { useState, useEffect, useMemo, forwardRef, Fragment } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import api from '../api';
+import { DIAS_AVISO, EVENTO_PRESTAMOS_ACTUALIZADOS, diasParaVencer, estaVencido, estaPorVencer, textoVence } from '../vencimientos';
+import { urlRemito, fechaDMY } from '../documentosPrestamo';
+import { ModalDevolucion } from '../components/DocumentosPrestamo';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { FiCalendar } from 'react-icons/fi';
@@ -21,13 +25,18 @@ const CustomDateInput = forwardRef(({ value, onClick }, ref) => (
   </div>
 ));
 
+// Date del calendario (hora local) → "2026-09-24"
+const aISODia = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
 function Prestamos({ auth }) {
   const hoy = new Date();
+  const [searchParams] = useSearchParams();
+  const prestamoDestacado = Number(searchParams.get('prestamo')) || null; // llega desde "Ver préstamo" en Remitos
   const [prestamos, setPrestamos] = useState([]);
   const [equipos, setEquipos] = useState([]);
   const [hospitales, setHospitales] = useState([]);
 
-  const [tabActivo, setTabActivo] = useState('todos'); // todos | activos | vencidos | devueltos
+  const [tabActivo, setTabActivo] = useState('todos'); // todos | activos | porvencer | vencidos | devueltos
   const [busqueda, setBusqueda] = useState('');
 
   // Modal nuevo préstamo
@@ -46,12 +55,21 @@ function Prestamos({ auth }) {
   const [mostrarListaHospital, setMostrarListaHospital] = useState(false);
   const [componentesPrestamo, setComponentesPrestamo] = useState([]);
 
-  // Modal devolución
+  // Modales de entrega y devolución (componentes compartidos con la pantalla Remitos)
   const [modalDevolucion, setModalDevolucion] = useState(null); // prestamo seleccionado
-  const [fechaDevolucion, setFechaDevolucion] = useState(hoyISO());
-  const [obsDevolucion, setObsDevolucion] = useState('');
 
-  function hoyISO() { return new Date().toISOString().split('T')[0]; }
+  // Confirmación de remito generado al registrar un préstamo
+  const [remitoCreado, setRemitoCreado] = useState(null);
+
+  // Prórrogas
+  const [modalProrroga, setModalProrroga] = useState(null); // prestamo seleccionado
+  const [fechaProrroga, setFechaProrroga] = useState('');
+  const [motivoProrroga, setMotivoProrroga] = useState('');
+  const [errorProrroga, setErrorProrroga] = useState('');
+
+  // Historial de prórrogas desplegable por préstamo
+  const [historialAbierto, setHistorialAbierto] = useState({}); // idPrestamo → bool
+  const alternarHistorial = (id) => setHistorialAbierto(prev => ({ ...prev, [id]: !prev[id] }));
 
   const MOTIVOS_PRESTAMO = [
     { valor: 'Emergencia sanitaria', color: 'rojo' },
@@ -83,20 +101,31 @@ function Prestamos({ auth }) {
     setPrestamos(rp.data);
     setEquipos(re.data);
     setHospitales(rh.data);
+    window.dispatchEvent(new CustomEvent(EVENTO_PRESTAMOS_ACTUALIZADOS, { detail: rp.data }));
   };
 
-  // ─── Helpers de estado ───
-  const estaVencido = (p) => p.estado === 'En préstamo' && p.fechaEstimadaDevolucion && new Date(p.fechaEstimadaDevolucion) < new Date();
+  // Al llegar desde Remitos ("Ver préstamo"), llevar la vista a ese préstamo
+  useEffect(() => {
+    if (prestamoDestacado && prestamos.length > 0)
+      document.getElementById(`prestamo-${prestamoDestacado}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [prestamoDestacado, prestamos]);
 
+  // ─── Helpers de estado ───
   const estadoVisual = (p) => {
     if (p.estado === 'Devuelto') return { label: 'Devuelto', bg: '#F1EFE8', fg: '#444441' };
     if (estaVencido(p)) return { label: 'Vencido', bg: '#FAECE7', fg: '#712B13' };
+    if (estaPorVencer(p)) return { label: textoVence(diasParaVencer(p)), bg: '#FDEBD0', fg: '#8A4B00' };
     return { label: 'En préstamo', bg: '#E6F1FB', fg: '#0C447C' };
   };
 
+  const prestamosPorVencer = useMemo(() =>
+    prestamos.filter(estaPorVencer).sort((a, b) => diasParaVencer(a) - diasParaVencer(b)),
+    [prestamos]);
+
   const prestamosFiltrados = useMemo(() => {
     let lista = [...prestamos];
-    if (tabActivo === 'activos') lista = lista.filter(p => p.estado === 'En préstamo' && !estaVencido(p));
+    if (tabActivo === 'activos') lista = lista.filter(p => p.estado === 'En préstamo' && !estaVencido(p) && !estaPorVencer(p));
+    if (tabActivo === 'porvencer') lista = lista.filter(p => estaPorVencer(p));
     if (tabActivo === 'vencidos') lista = lista.filter(p => estaVencido(p));
     if (tabActivo === 'devueltos') lista = lista.filter(p => p.estado === 'Devuelto');
 
@@ -113,7 +142,8 @@ function Prestamos({ auth }) {
 
   const conteos = useMemo(() => ({
     todos: prestamos.length,
-    activos: prestamos.filter(p => p.estado === 'En préstamo' && !estaVencido(p)).length,
+    activos: prestamos.filter(p => p.estado === 'En préstamo' && !estaVencido(p) && !estaPorVencer(p)).length,
+    porVencer: prestamos.filter(p => estaPorVencer(p)).length,
     vencidos: prestamos.filter(p => estaVencido(p)).length,
     devueltos: prestamos.filter(p => p.estado === 'Devuelto').length
   }), [prestamos]);
@@ -184,7 +214,7 @@ function Prestamos({ auth }) {
     if (Object.keys(errs).length > 0) return;
 
     try {
-      await api.post('/prestamos', {
+      const r = await api.post('/prestamos', {
         idEquipo: parseInt(idEquipo),
         idHospital: parseInt(idHospital),
         idUsuario: auth?.usuario?.idUsuario || 1,
@@ -195,6 +225,7 @@ function Prestamos({ auth }) {
         componentes: componentesPrestamo
       });
       cerrarModal();
+      setRemitoCreado(r.data);
       cargarTodo();
     } catch (err) {
       const mensaje = typeof err.response?.data === 'string' ? err.response.data : 'No se pudo registrar el préstamo.';
@@ -202,24 +233,38 @@ function Prestamos({ auth }) {
     }
   };
 
-  // ─── Modal devolución ───
-  const abrirDevolucion = (p) => {
-    setModalDevolucion(p);
-    setFechaDevolucion(hoyISO());
-    setObsDevolucion('');
+  // ─── Modal prórroga ───
+  // La nueva fecha tiene que ser posterior a la estimada actual y no anterior a hoy (si no, seguiría vencido)
+  const minFechaProrroga = (p) => {
+    const hoyDia = new Date(); hoyDia.setHours(0, 0, 0, 0);
+    if (!p?.fechaEstimadaDevolucion) return hoyDia;
+    const siguiente = new Date(p.fechaEstimadaDevolucion.split('T')[0] + 'T00:00:00');
+    siguiente.setDate(siguiente.getDate() + 1);
+    return siguiente > hoyDia ? siguiente : hoyDia;
   };
-  const cerrarDevolucion = () => setModalDevolucion(null);
 
-  const confirmarDevolucion = async () => {
+  const abrirProrroga = (p) => {
+    setModalProrroga(p);
+    setFechaProrroga('');
+    setMotivoProrroga('');
+    setErrorProrroga('');
+  };
+  const cerrarProrroga = () => setModalProrroga(null);
+
+  const confirmarProrroga = async () => {
+    if (!fechaProrroga) { setErrorProrroga('Elegí la nueva fecha de devolución.'); return; }
+    if (!motivoProrroga.trim()) { setErrorProrroga('Indicá el motivo de la prórroga.'); return; }
     try {
-      await api.put(`/prestamos/${modalDevolucion.idPrestamo}/devolucion`, {
-        fechaDevolucionReal: fechaDevolucion,
-        observaciones: obsDevolucion || null
+      await api.post(`/prestamos/${modalProrroga.idPrestamo}/prorrogar`, {
+        fechaNueva: fechaProrroga,
+        motivo: motivoProrroga.trim(),
+        idUsuario: auth?.usuario?.idUsuario || 1
       });
-      cerrarDevolucion();
+      setHistorialAbierto(prev => ({ ...prev, [modalProrroga.idPrestamo]: true }));
+      cerrarProrroga();
       cargarTodo();
-    } catch {
-      alert('No se pudo registrar la devolución.');
+    } catch (err) {
+      setErrorProrroga(typeof err.response?.data === 'string' ? err.response.data : 'No se pudo registrar la prórroga.');
     }
   };
 
@@ -250,6 +295,13 @@ function Prestamos({ auth }) {
         <div style={{ display: 'flex', gap: 24, borderBottom: '1px solid #E5EDF3', marginTop: 18, alignItems: 'center', flexWrap: 'wrap' }}>
           <div onClick={() => setTabActivo('todos')} style={tabStyle(tabActivo === 'todos')}>Todos ({conteos.todos})</div>
           <div onClick={() => setTabActivo('activos')} style={tabStyle(tabActivo === 'activos')}>En préstamo ({conteos.activos})</div>
+          <div onClick={() => setTabActivo('porvencer')} style={{ ...tabStyle(tabActivo === 'porvencer'), display: 'flex', alignItems: 'center', gap: 6 }}>
+            Por vencer
+            <span style={{
+              minWidth: 20, padding: '1px 7px', borderRadius: 999, fontSize: 11, fontWeight: 700, textAlign: 'center',
+              background: conteos.porVencer > 0 ? '#F2A541' : '#EEF1F4', color: conteos.porVencer > 0 ? 'white' : '#6B7C8C'
+            }}>{conteos.porVencer}</span>
+          </div>
           <div onClick={() => setTabActivo('vencidos')} style={tabStyle(tabActivo === 'vencidos')}>Vencidos ({conteos.vencidos})</div>
           <div onClick={() => setTabActivo('devueltos')} style={tabStyle(tabActivo === 'devueltos')}>Devueltos ({conteos.devueltos})</div>
           <div style={{ marginLeft: 'auto' }}>
@@ -261,6 +313,37 @@ function Prestamos({ auth }) {
           </div>
         </div>
       </div>
+
+      {/* ── ALERTAS: préstamos por vencer (el aviso al hospital por ahora se hace a mano) ── */}
+      {prestamosPorVencer.length > 0 && (
+        <div style={{ padding: '16px 24px 0', background: 'white' }}>
+          <div style={alertaBox}>
+            <div style={{ fontWeight: 700, fontSize: 13, color: '#8A4B00', marginBottom: 10 }}>
+              ⏰ {prestamosPorVencer.length} préstamo{prestamosPorVencer.length !== 1 ? 's' : ''} por vencer en los próximos {DIAS_AVISO} días: avisar al hospital
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 10 }}>
+              {prestamosPorVencer.map(p => (
+                <div key={p.idPrestamo} style={alertaCard}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'baseline' }}>
+                    <span style={{ fontWeight: 700, color: '#1a1a1a' }}>{p.equipo?.modelo}</span>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: '#8A4B00', whiteSpace: 'nowrap' }}>
+                      {textoVence(diasParaVencer(p))} ({p.fechaEstimadaDevolucion?.split('T')[0].split('-').reverse().join('/')})
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 11, color: '#9E9CBB', fontFamily: 'monospace' }}>{p.equipo?.nroSerie}</div>
+                  <div style={{ marginTop: 6, fontWeight: 600, color: '#2D3748' }}>🏥 {p.hospital?.nombre}</div>
+                  <div style={{ fontSize: 12, color: '#4A5868', marginTop: 2, lineHeight: 1.6 }}>
+                    <div>👤 {p.hospital?.contacto || 'Sin contacto cargado'}</div>
+                    {p.hospital?.telefono && <div>📞 {p.hospital.telefono}</div>}
+                    {p.hospital?.email && <div style={{ wordBreak: 'break-all' }}>✉ {p.hospital.email}</div>}
+                    {!p.hospital?.telefono && !p.hospital?.email && <div style={{ color: '#B45309' }}>Sin teléfono ni email: completalos en Hospitales externos</div>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── TABLA ── */}
       <div className="rwd-table-wrap" style={{ padding: '20px 24px', background: 'white', overflowX: 'auto' }}>
@@ -278,8 +361,17 @@ function Prestamos({ auth }) {
           <tbody>
             {prestamosFiltrados.map(p => {
               const ev = estadoVisual(p);
+              const porVencer = estaPorVencer(p);
+              const prorrogas = p.prorrogas || [];
+              const verHistorial = prorrogas.length > 0 && !!historialAbierto[p.idPrestamo];
+              const destacado = p.idPrestamo === prestamoDestacado;
               return (
-                <tr key={p.idPrestamo} style={{ borderBottom: '1px solid #F1F4F7' }}>
+                <Fragment key={p.idPrestamo}>
+                <tr id={`prestamo-${p.idPrestamo}`} style={{
+                  borderBottom: '1px solid #F1F4F7',
+                  background: destacado ? '#EEF6FB' : porVencer ? '#FFF8EC' : undefined,
+                  boxShadow: destacado ? 'inset 3px 0 0 #2C7DA0' : porVencer ? 'inset 3px 0 0 #F2A541' : undefined
+                }}>
                   <td style={{ ...tdStyle, fontWeight: 500 }}>
                     {p.equipo?.modelo}
                     <div style={{ fontSize: 11, color: '#9E9CBB', fontFamily: 'monospace' }}>{p.equipo?.nroSerie}</div>
@@ -303,23 +395,66 @@ function Prestamos({ auth }) {
                     )}
                   </td>
                   <td style={tdStyle}>{p.fechaPrestamo?.split('T')[0]}</td>
-                  <td style={tdStyle}>{p.fechaEstimadaDevolucion?.split('T')[0] || '—'}</td>
+                  <td style={tdStyle}>
+                    {p.fechaEstimadaDevolucion?.split('T')[0] || '—'}
+                    {prorrogas.length > 0 && (
+                      <div>
+                        <button
+                          onClick={() => alternarHistorial(p.idPrestamo)}
+                          style={btnHistorial}
+                          title={`Fecha original: ${fechaDMY(p.fechaEstimadaDevolucionOriginal)}`}
+                        >
+                          ↻ Prorrogado {prorrogas.length} {prorrogas.length === 1 ? 'vez' : 'veces'} {verHistorial ? '▴' : '▾'}
+                        </button>
+                      </div>
+                    )}
+                  </td>
                   <td style={tdStyle}>
                     <span style={{ display: 'inline-block', padding: '4px 12px', borderRadius: 999, background: ev.bg, color: ev.fg, fontSize: 12, fontWeight: 500 }}>
                       {ev.label}
                     </span>
                   </td>
                   <td style={tdStyle}>
-                    {p.estado === 'En préstamo' && (
-                      <button onClick={() => abrirDevolucion(p)} style={btnDevolver}>↩ Registrar devolución</button>
-                    )}
-                    {p.estado === 'Devuelto' && (
-                      <span style={{ fontSize: 12, color: '#9E9CBB' }}>
-                        Devuelto el {p.fechaDevolucionReal?.split('T')[0]}
-                      </span>
-                    )}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                      {p.estado === 'En préstamo' && (
+                        <button onClick={() => setModalDevolucion(p)} style={btnDevolver}>↩ Registrar devolución</button>
+                      )}
+                      {p.estado === 'En préstamo' && (
+                        <button onClick={() => abrirProrroga(p)} style={btnProrrogar}>⏩ Prorrogar</button>
+                      )}
+                      {p.estado === 'Devuelto' && (
+                        <span style={{ fontSize: 12, color: '#9E9CBB' }}>
+                          Devuelto el {p.fechaDevolucionReal?.split('T')[0]}
+                        </span>
+                      )}
+                      {p.numeroRemito && (
+                        <Link to={`/remitos?remito=${p.numeroRemito}`} style={lnkRemito} title="Ver los documentos de este préstamo en Remitos">
+                          📄 {p.numeroRemito}
+                        </Link>
+                      )}
+                    </div>
                   </td>
                 </tr>
+                {verHistorial && (
+                  <tr style={{ background: '#FAFBFC', borderBottom: '1px solid #F1F4F7' }}>
+                    <td colSpan="6" style={{ padding: '10px 16px 14px', whiteSpace: 'normal' }}>
+                      <div style={tituloDetalle}>
+                        Historial de prórrogas · fecha pactada originalmente: {fechaDMY(p.fechaEstimadaDevolucionOriginal)}
+                      </div>
+                      {prorrogas.map((pr, i) => (
+                        <div key={pr.idProrroga} style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'baseline', fontSize: 12, color: '#4A5868', padding: '5px 0', borderTop: i > 0 ? '1px dashed #E5EDF3' : 'none' }}>
+                          <span style={{ fontWeight: 700, color: '#2C7DA0', minWidth: 22 }}>#{i + 1}</span>
+                          <span style={{ fontFamily: 'monospace' }}>{fechaDMY(pr.fechaAnterior)} → <b>{fechaDMY(pr.fechaNueva)}</b></span>
+                          <span style={{ flex: 1, minWidth: 160, whiteSpace: 'normal' }}>{pr.motivo}</span>
+                          <span style={{ color: '#9E9CBB' }}>
+                            Solicitada el {new Date(pr.fechaSolicitud).toLocaleDateString('es-AR')}{pr.autorizadoPor && ` · autorizó ${pr.autorizadoPor}`}
+                          </span>
+                        </div>
+                      ))}
+                    </td>
+                  </tr>
+                )}
+                </Fragment>
               );
             })}
             {prestamosFiltrados.length === 0 && (
@@ -531,40 +666,99 @@ function Prestamos({ auth }) {
         </div>
       )}
 
-      {/* ── MODAL: REGISTRAR DEVOLUCIÓN ── */}
-      {modalDevolucion && (
-        <div onClick={cerrarDevolucion} className="rwd-modal-overlay" style={overlayStyle}>
-          <div onClick={e => e.stopPropagation()} className="rwd-modal-box" style={{ ...modalStyle, maxWidth: 480 }}>
+      {/* ── MODAL: REMITO GENERADO ── */}
+      {remitoCreado && (
+        <div onClick={() => setRemitoCreado(null)} className="rwd-modal-overlay" style={overlayStyle}>
+          <div onClick={e => e.stopPropagation()} className="rwd-modal-box" style={{ ...modalStyle, maxWidth: 460 }}>
             <div style={modalHeaderStyle}>
-              <div style={{ width: 52, height: 52, borderRadius: 12, background: 'linear-gradient(135deg, #E1F5EE 0%, #CFEEE1 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>↩</div>
+              <div style={{ width: 52, height: 52, borderRadius: 12, background: 'linear-gradient(135deg, #E1F5EE 0%, #CFEEE1 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>📄</div>
               <div style={{ flex: 1 }}>
-                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1a1a1a' }}>Registrar devolución</h3>
+                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1a1a1a' }}>Préstamo registrado</h3>
                 <p style={{ margin: '4px 0 0', color: '#6B7C8C', fontSize: 13 }}>
-                  {modalDevolucion.equipo?.modelo} · {modalDevolucion.hospital?.nombre}
+                  {remitoCreado.tieneRemitoPdf ? 'El remito se generó correctamente.' : 'El remito se generará al abrirlo.'}
                 </p>
               </div>
-              <button onClick={cerrarDevolucion} style={btnCerrarX}>✕</button>
+              <button onClick={() => setRemitoCreado(null)} style={btnCerrarX}>✕</button>
+            </div>
+
+            <div style={{ padding: '20px 28px 24px', textAlign: 'center' }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: '#6B7C8C', letterSpacing: '0.5px' }}>N° DE REMITO</div>
+              <div style={{ fontSize: 26, fontWeight: 700, color: '#2C7DA0', margin: '4px 0 12px', fontFamily: 'monospace' }}>{remitoCreado.numeroRemito}</div>
+              <div style={{ fontSize: 13, color: '#4A5868' }}>
+                {remitoCreado.equipo?.modelo} <span style={{ color: '#9E9CBB' }}>({remitoCreado.equipo?.nroSerie})</span>
+              </div>
+              <div style={{ fontSize: 13, color: '#4A5868', marginTop: 2 }}>→ {remitoCreado.hospital?.nombre}</div>
+              <p style={{ fontSize: 12, color: '#6B7C8C', margin: '14px 0 0' }}>
+                Imprimilo para que firmen quien entrega y quien retira el equipo. Después subí el escaneo
+                {' '}desde Remitos con "Subir firmado".
+              </p>
+            </div>
+
+            <div style={modalFooterStyle}>
+              <button onClick={() => setRemitoCreado(null)} style={btnGhost}>Cerrar</button>
+              <a href={urlRemito(remitoCreado.idPrestamo, true)} style={{ ...btnGhost, textDecoration: 'none' }}>⬇ Descargar</a>
+              <a href={urlRemito(remitoCreado.idPrestamo)} target="_blank" rel="noreferrer" style={{ ...btnSave, textDecoration: 'none' }}>🖨 Ver / imprimir</a>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL: PRORROGAR ── */}
+      {modalProrroga && (
+        <div onClick={cerrarProrroga} className="rwd-modal-overlay" style={overlayStyle}>
+          <div onClick={e => e.stopPropagation()} className="rwd-modal-box" style={{ ...modalStyle, maxWidth: 480 }}>
+            <div style={modalHeaderStyle}>
+              <div style={{ width: 52, height: 52, borderRadius: 12, background: 'linear-gradient(135deg, #EEEDFE 0%, #DEDCFB 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>⏩</div>
+              <div style={{ flex: 1 }}>
+                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1a1a1a' }}>Prorrogar préstamo</h3>
+                <p style={{ margin: '4px 0 0', color: '#6B7C8C', fontSize: 13 }}>
+                  {modalProrroga.equipo?.modelo} · {modalProrroga.hospital?.nombre}
+                </p>
+              </div>
+              <button onClick={cerrarProrroga} style={btnCerrarX}>✕</button>
             </div>
 
             <div style={{ padding: '20px 28px 24px' }}>
-              <label style={lblStyle}>Fecha de devolución *</label>
-              <input type="date" value={fechaDevolucion} onChange={e => setFechaDevolucion(e.target.value)} style={inpStyle} />
+              {errorProrroga && <div style={bannerError}>⚠ {errorProrroga}</div>}
 
-              <label style={{ ...lblStyle, marginTop: 14 }}>Observaciones</label>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#6B7C8C', marginBottom: 14, gap: 8, flexWrap: 'wrap' }}>
+                <span>Devolución estimada actual: <b style={{ color: estaVencido(modalProrroga) ? '#712B13' : '#2D3748' }}>{fechaDMY(modalProrroga.fechaEstimadaDevolucion)}{estaVencido(modalProrroga) && ' (vencido)'}</b></span>
+                {(modalProrroga.prorrogas?.length || 0) > 0 && <span>Prórrogas previas: {modalProrroga.prorrogas.length}</span>}
+              </div>
+
+              <label style={lblStyle}>Nueva fecha de devolución estimada *</label>
+              <DatePicker
+                selected={fechaProrroga ? new Date(fechaProrroga + 'T00:00:00') : null}
+                onChange={(date) => setFechaProrroga(date ? aISODia(date) : '')}
+                dateFormat="dd/MM/yyyy"
+                minDate={minFechaProrroga(modalProrroga)}
+                customInput={<CustomDateInput />}
+              />
+
+              <label style={{ ...lblStyle, marginTop: 14 }}>Motivo *</label>
               <textarea
-                value={obsDevolucion} onChange={e => setObsDevolucion(e.target.value)}
-                placeholder="Estado en que vuelve el equipo, novedades, etc."
-                rows={3}
+                value={motivoProrroga} onChange={e => setMotivoProrroga(e.target.value)}
+                placeholder="Ej: Paciente continúa en tratamiento"
+                rows={3} maxLength={300}
                 style={{ ...inpStyle, resize: 'vertical', fontFamily: 'inherit' }}
               />
             </div>
 
             <div style={modalFooterStyle}>
-              <button onClick={cerrarDevolucion} style={btnGhost}>Cancelar</button>
-              <button onClick={confirmarDevolucion} style={btnSave}>✓ Confirmar devolución</button>
+              <button onClick={cerrarProrroga} style={btnGhost}>Cancelar</button>
+              <button onClick={confirmarProrroga} style={btnSave}>✓ Confirmar prórroga</button>
             </div>
           </div>
         </div>
+      )}
+
+      {/* ── MODAL: REGISTRAR DEVOLUCIÓN (genera el remito DEV) ── */}
+      {modalDevolucion && (
+        <ModalDevolucion
+          prestamo={modalDevolucion}
+          onCerrar={() => setModalDevolucion(null)}
+          onRegistrado={cargarTodo}
+        />
       )}
 
       <style>{`
@@ -600,6 +794,12 @@ const btnSave = { background: 'linear-gradient(135deg, #2C7DA0 0%, #4A9BB8 100%)
 const btnCerrarX = { background: '#F4F7FA', border: 'none', width: 32, height: 32, borderRadius: 8, fontSize: 18, cursor: 'pointer', color: '#6B7C8C' };
 const btnLimpiarX = { background: 'transparent', border: 'none', color: '#9E9CBB', fontSize: 16, cursor: 'pointer', padding: '4px 8px' };
 const btnDevolver = { background: '#E1F5EE', color: '#0F6E56', border: '1px solid #CFEEE1', borderRadius: 999, padding: '6px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer' };
+const tituloDetalle = { fontSize: 11, fontWeight: 600, color: '#6B7C8C', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 6 };
+const btnProrrogar = { background: '#EEEDFE', color: '#3C3489', border: '1px solid #DEDCFB', borderRadius: 999, padding: '6px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer' };
+const btnHistorial = { background: 'none', border: 'none', padding: 0, marginTop: 3, color: '#5e51d6', fontSize: 11, fontWeight: 600, cursor: 'pointer' };
+const lnkRemito = { color: '#2C7DA0', padding: '5px 10px', fontSize: 12, fontWeight: 600, textDecoration: 'none', fontFamily: 'monospace', border: '1px solid #D6E4EE', borderRadius: 999, background: '#F0F6FA' };
+const alertaBox = { background: '#FFF8EC', border: '1px solid #F7D9A8', borderLeft: '4px solid #F2A541', borderRadius: 10, padding: '14px 16px' };
+const alertaCard = { background: 'white', border: '1px solid #F3E3C7', borderRadius: 8, padding: '10px 12px', fontSize: 13 };
 const overlayStyle = { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(20,25,40,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20 };
 const modalStyle = { background: 'white', borderRadius: 16, width: '100%', maxHeight: '92vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.25)' };
 const modalHeaderStyle = { padding: '24px 28px 20px', borderBottom: '1px solid #F0F3F7', display: 'flex', alignItems: 'center', gap: 16 };

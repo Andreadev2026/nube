@@ -17,7 +17,7 @@ namespace NODUS.Data.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.0")
+                .HasAnnotation("ProductVersion", "10.0.4")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -608,13 +608,29 @@ namespace NODUS.Data.Migrations
                         .HasColumnType("character varying(30)")
                         .HasColumnName("estado");
 
+                    b.Property<DateTime?>("FechaCargaFirmaDevolucion")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("fecha_carga_firma_devolucion");
+
+                    b.Property<DateTime?>("FechaCargaFirmaSalida")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("fecha_carga_firma_salida");
+
                     b.Property<DateTime?>("FechaDevolucionReal")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("fecha_devolucion_real");
 
+                    b.Property<DateTime?>("FechaEmisionRemito")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("fecha_emision_remito");
+
                     b.Property<DateTime?>("FechaEstimadaDevolucion")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("fecha_estimada_devolucion");
+
+                    b.Property<DateTime?>("FechaEstimadaDevolucionOriginal")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("fecha_estimada_devolucion_original");
 
                     b.Property<DateTime>("FechaPrestamo")
                         .HasColumnType("timestamp with time zone")
@@ -637,9 +653,44 @@ namespace NODUS.Data.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("motivo");
 
+                    b.Property<string>("NumeroRemito")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("numero_remito");
+
+                    b.Property<string>("NumeroRemitoDevolucion")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("numero_remito_devolucion");
+
                     b.Property<string>("Observaciones")
                         .HasColumnType("text")
                         .HasColumnName("observaciones");
+
+                    b.Property<string>("ObservacionesDevolucion")
+                        .HasColumnType("text")
+                        .HasColumnName("observaciones_devolucion");
+
+                    b.Property<string>("RutaRemitoDevolucionFirmado")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("ruta_remito_devolucion_firmado");
+
+                    b.Property<string>("RutaRemitoDevolucionPdf")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("ruta_remito_devolucion_pdf");
+
+                    b.Property<string>("RutaRemitoPdf")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("ruta_remito_pdf");
+
+                    b.Property<string>("RutaRemitoSalidaFirmado")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("ruta_remito_salida_firmado");
 
                     b.HasKey("IdPrestamo");
 
@@ -648,6 +699,12 @@ namespace NODUS.Data.Migrations
                     b.HasIndex("IdHospital");
 
                     b.HasIndex("IdUsuario");
+
+                    b.HasIndex("NumeroRemito")
+                        .IsUnique();
+
+                    b.HasIndex("NumeroRemitoDevolucion")
+                        .IsUnique();
 
                     b.ToTable("prestamo", (string)null);
                 });
@@ -676,6 +733,70 @@ namespace NODUS.Data.Migrations
                     b.HasIndex("IdPrestamo");
 
                     b.ToTable("prestamo_componente", (string)null);
+                });
+
+            modelBuilder.Entity("NODUS.Models.ProrrogaPrestamo", b =>
+                {
+                    b.Property<int>("IdProrroga")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id_prorroga");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("IdProrroga"));
+
+                    b.Property<DateTime?>("FechaAnterior")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("fecha_anterior");
+
+                    b.Property<DateTime>("FechaNueva")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("fecha_nueva");
+
+                    b.Property<DateTime>("FechaSolicitud")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("fecha_solicitud");
+
+                    b.Property<int>("IdPrestamo")
+                        .HasColumnType("integer")
+                        .HasColumnName("id_prestamo");
+
+                    b.Property<int>("IdUsuario")
+                        .HasColumnType("integer")
+                        .HasColumnName("id_usuario");
+
+                    b.Property<string>("Motivo")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("motivo");
+
+                    b.HasKey("IdProrroga");
+
+                    b.HasIndex("IdPrestamo");
+
+                    b.HasIndex("IdUsuario");
+
+                    b.ToTable("prorroga_prestamo", (string)null);
+                });
+
+            modelBuilder.Entity("NODUS.Models.RemitoContador", b =>
+                {
+                    b.Property<string>("Tipo")
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("tipo");
+
+                    b.Property<int>("Anio")
+                        .HasColumnType("integer")
+                        .HasColumnName("anio");
+
+                    b.Property<int>("UltimoNumero")
+                        .HasColumnType("integer")
+                        .HasColumnName("ultimo_numero");
+
+                    b.HasKey("Tipo", "Anio");
+
+                    b.ToTable("remito_contador", (string)null);
                 });
 
             modelBuilder.Entity("NODUS.Models.Sector", b =>
@@ -1146,6 +1267,25 @@ namespace NODUS.Data.Migrations
                     b.Navigation("Prestamo");
                 });
 
+            modelBuilder.Entity("NODUS.Models.ProrrogaPrestamo", b =>
+                {
+                    b.HasOne("NODUS.Models.Prestamo", "Prestamo")
+                        .WithMany("Prorrogas")
+                        .HasForeignKey("IdPrestamo")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("NODUS.Models.Usuario", "Usuario")
+                        .WithMany()
+                        .HasForeignKey("IdUsuario")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Prestamo");
+
+                    b.Navigation("Usuario");
+                });
+
             modelBuilder.Entity("NODUS.Models.Ubicacion", b =>
                 {
                     b.HasOne("NODUS.Models.Equipo", "Equipo")
@@ -1248,6 +1388,8 @@ namespace NODUS.Data.Migrations
             modelBuilder.Entity("NODUS.Models.Prestamo", b =>
                 {
                     b.Navigation("PrestamoComponentes");
+
+                    b.Navigation("Prorrogas");
                 });
 
             modelBuilder.Entity("NODUS.Models.TipoActivo", b =>

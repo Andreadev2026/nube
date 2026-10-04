@@ -4,6 +4,13 @@ import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { FiCalendar } from "react-icons/fi";
 import catalogoComponentesRespiratorios from '../data/catalogoComponentesRespiratorios';
+import {
+  DIAS_AVISO_GARANTIA, EVENTO_EQUIPOS_ACTUALIZADOS,
+  diasParaVencerGarantia, garantiaPorVencer, garantiaVencida, textoVence
+} from '../vencimientos';
+
+// "2026-10-03T00:00:00Z" → "03/10/2026"
+const fechaDMY = (iso) => iso ? iso.split('T')[0].split('-').reverse().join('/') : '—';
 
 const CustomDateInput = forwardRef(({ value, onClick }, ref) => (
   <div
@@ -104,7 +111,11 @@ function Activos() {
     return () => window.removeEventListener('keydown', handleEsc);
   }, [modalAbierto, modalAlertasEquipo]);
 
-  const cargarEquipos = async () => { const r = await api.get('/equipos'); setEquipos(r.data); };
+  const cargarEquipos = async () => {
+    const r = await api.get('/equipos');
+    setEquipos(r.data);
+    window.dispatchEvent(new CustomEvent(EVENTO_EQUIPOS_ACTUALIZADOS, { detail: r.data }));
+  };
   const cargarMarcas  = async () => { const r = await api.get('/marcas'); setMarcas(r.data); };
   const cargarTipos   = async () => { const r = await api.get('/tiposactivo'); setTipos(r.data); };
   const cargarEstados = async () => { const r = await api.get('/estadosequipo'); setEstados(r.data); };
@@ -123,7 +134,11 @@ function Activos() {
 
   const equiposFiltrados = useMemo(() => {
     let lista = [...equipos];
-    if (tabActivo !== 'todos') {
+    if (tabActivo === 'garantia-porvencer') {
+      lista = lista.filter(garantiaPorVencer).sort((a, b) => diasParaVencerGarantia(a) - diasParaVencerGarantia(b));
+    } else if (tabActivo === 'garantia-vencida') {
+      lista = lista.filter(garantiaVencida);
+    } else if (tabActivo !== 'todos') {
       lista = lista.filter(e => e.idEstado === parseInt(tabActivo));
     }
     if (busqueda.trim()) {
@@ -145,6 +160,12 @@ function Activos() {
       }))
       .filter(estado => estado.cantidad > 0);
   }, [estados, equipos]);
+
+  // Garantías: los activos dados de baja o sin garantía cargada quedan fuera (ver vencimientos.js)
+  const equiposGarantiaPorVencer = useMemo(() =>
+    equipos.filter(garantiaPorVencer).sort((a, b) => diasParaVencerGarantia(a) - diasParaVencerGarantia(b)),
+    [equipos]);
+  const cantGarantiaVencida = useMemo(() => equipos.filter(garantiaVencida).length, [equipos]);
 
   const abrirModalNuevo = () => { limpiar(); setModalAbierto(true); };
   const abrirModalEditar = (eq) => {
@@ -463,6 +484,18 @@ function Activos() {
               {estado.nombre} ({estado.cantidad})
             </div>
           ))}
+          <span style={{ width: 1, height: 18, background: '#E5EDF3' }} />
+          <div onClick={() => setTabActivo('garantia-porvencer')} style={{ ...tabStyle(tabActivo === 'garantia-porvencer'), display: 'flex', alignItems: 'center', gap: 6 }}>
+            Garantía por vencer
+            <span style={{
+              minWidth: 20, padding: '1px 7px', borderRadius: 999, fontSize: 11, fontWeight: 700, textAlign: 'center',
+              background: equiposGarantiaPorVencer.length > 0 ? '#F2A541' : '#EEF1F4',
+              color: equiposGarantiaPorVencer.length > 0 ? 'white' : '#6B7C8C'
+            }}>{equiposGarantiaPorVencer.length}</span>
+          </div>
+          <div onClick={() => setTabActivo('garantia-vencida')} style={tabStyle(tabActivo === 'garantia-vencida')}>
+            Garantía vencida ({cantGarantiaVencida})
+          </div>
           <div style={{
             marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6,
             background: busquedaAbierta ? '#F0F6FA' : 'transparent',
@@ -496,15 +529,44 @@ function Activos() {
         </div>
       </div>
 
+      {/* ── ALERTAS: garantías por vencer ── */}
+      {equiposGarantiaPorVencer.length > 0 && (
+        <div style={{ padding: '16px 24px 0', background: 'white' }}>
+          <div style={alertaBox}>
+            <div style={{ fontWeight: 700, fontSize: 13, color: '#8A4B00', marginBottom: 10 }}>
+              ⏰ {equiposGarantiaPorVencer.length} activo{equiposGarantiaPorVencer.length !== 1 ? 's' : ''} con garantía por vencer en los próximos {DIAS_AVISO_GARANTIA} días
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 10 }}>
+              {equiposGarantiaPorVencer.map(eq => (
+                <div key={eq.idEquipo} style={alertaCard}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'baseline' }}>
+                    <span style={{ fontWeight: 700, color: '#1a1a1a' }}>{[eq.marca?.nombre, eq.modelo].filter(Boolean).join(' · ')}</span>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: '#8A4B00', whiteSpace: 'nowrap' }}>
+                      {textoVence(diasParaVencerGarantia(eq))}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 11, color: '#9E9CBB', fontFamily: 'monospace' }}>{eq.nroSerie}</div>
+                  <div style={{ fontSize: 12, color: '#4A5868', marginTop: 6, lineHeight: 1.6 }}>
+                    <div>🛡 Garantía hasta el {fechaDMY(eq.vencimientoGarantia)}</div>
+                    <div>📍 {eq.ubicacionActual || <span style={{ color: '#9E9CBB' }}>Sin ubicación registrada</span>}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── TABLA ── */}
       <div className="rwd-table-wrap" style={{ padding: '20px 24px', background: 'white', overflowX: 'auto' }}>
-        <table className="rwd-table" style={{ width: '100%', borderCollapse: 'collapse', minWidth: 700 }}>
+        <table className="rwd-table" style={{ width: '100%', borderCollapse: 'collapse', minWidth: 800 }}>
           <thead>
             <tr style={{ textAlign: 'left' }}>
               <th style={thStyle}>Marca</th>
               <th style={thStyle}>Modelo</th>
               <th style={thStyle}>N° serie</th>
               <th style={thStyle}>Estado</th>
+              <th style={thStyle}>Garantía</th>
               <th style={thStyle}>Alerta</th>
               <th style={thStyle}>Acciones</th>
             </tr>
@@ -514,8 +576,14 @@ function Activos() {
               const cm = colorMarca(eq.marca?.nombre);
               const ce = chipEstado(eq.estadoEquipo?.colorSemaforo);
               const cantAlertas = (alertasPorEquipo[eq.idEquipo] || []).length;
+              const porVencer = garantiaPorVencer(eq);
+              const vencida = garantiaVencida(eq);
               return (
-                <tr key={eq.idEquipo} style={{ borderBottom: '1px solid #F1F4F7' }}>
+                <tr key={eq.idEquipo} style={{
+                  borderBottom: '1px solid #F1F4F7',
+                  background: porVencer ? '#FFF8EC' : undefined,
+                  boxShadow: porVencer ? 'inset 3px 0 0 #F2A541' : undefined
+                }}>
                   <td style={tdStyle}>
                     <span style={{
                       display: 'inline-block', padding: '4px 12px', borderRadius: 999,
@@ -529,6 +597,17 @@ function Activos() {
                       display: 'inline-block', padding: '4px 12px', borderRadius: 999,
                       background: ce.bg, color: ce.fg, fontSize: 12, fontWeight: 500
                     }}>{eq.estadoEquipo?.nombre || '—'}</span>
+                  </td>
+                  <td style={tdStyle}>
+                    {eq.vencimientoGarantia ? (
+                      <>
+                        <div style={{ fontSize: 12, color: '#4A5868' }}>{fechaDMY(eq.vencimientoGarantia)}</div>
+                        {porVencer && <span style={{ ...chipGarantia, background: '#FDEBD0', color: '#8A4B00' }}>{textoVence(diasParaVencerGarantia(eq))}</span>}
+                        {vencida && <span style={{ ...chipGarantia, background: '#FAECE7', color: '#712B13' }}>Vencida</span>}
+                      </>
+                    ) : (
+                      <span style={{ color: '#9E9CBB', fontSize: 13 }}>—</span>
+                    )}
                   </td>
                   <td style={tdStyle}>
                     {cantAlertas > 0 ? (
@@ -557,7 +636,7 @@ function Activos() {
               );
             })}
             {equiposFiltrados.length === 0 && (
-              <tr><td colSpan="6" style={{ textAlign: 'center', padding: 40, color: '#9E9CBB', fontSize: 13 }}>
+              <tr><td colSpan="7" style={{ textAlign: 'center', padding: 40, color: '#9E9CBB', fontSize: 13 }}>
                 No hay activos para mostrar.
               </td></tr>
             )}
@@ -1302,6 +1381,11 @@ function SeccionTitulo({ icono, titulo }) {
 }
 
 // ── Estilos compartidos ──
+// Mismos colores que las alertas de préstamos (Prestamos.jsx) para "por vencer" y "vencido"
+const alertaBox = { background: '#FFF8EC', border: '1px solid #F7D9A8', borderLeft: '4px solid #F2A541', borderRadius: 10, padding: '14px 16px' };
+const alertaCard = { background: 'white', border: '1px solid #F3E3C7', borderRadius: 8, padding: '10px 12px', fontSize: 13 };
+const chipGarantia = { display: 'inline-block', marginTop: 3, padding: '2px 8px', borderRadius: 999, fontSize: 11, fontWeight: 600 };
+
 const thStyle = {
   fontSize: 11, fontWeight: 500, color: '#6B7C8C',
   padding: '12px 8px', borderBottom: '1px solid #F1F4F7',

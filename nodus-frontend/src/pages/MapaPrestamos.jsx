@@ -57,6 +57,7 @@ function MapaPrestamos() {
   const [prestamos, setPrestamos] = useState([]);
   const [hospitales, setHospitales] = useState([]);
   const [cargando, setCargando] = useState(true);
+  const [errorCarga, setErrorCarga] = useState('');
 
   const [geocodificando, setGeocodificando] = useState(false);
   const [resultadoGeo, setResultadoGeo] = useState(null);
@@ -67,15 +68,20 @@ function MapaPrestamos() {
   const [pegado, setPegado] = useState('');
   const [errorCoord, setErrorCoord] = useState('');
 
-  const cargar = async () => {
-    try {
-      const [rm, rh] = await Promise.all([api.get('/prestamos/mapa'), api.get('/hospitalesexternos')]);
-      setPrestamos(rm.data);
-      setHospitales(rh.data);
-    } finally {
-      setCargando(false);
-    }
-  };
+  const cargar = () =>
+    Promise.all([api.get('/prestamos/mapa'), api.get('/hospitalesexternos')])
+      .then(([rm, rh]) => {
+        setPrestamos(rm.data);
+        setHospitales(rh.data);
+        setErrorCarga('');
+      })
+      .catch((err) => {
+        const status = err.response?.status;
+        setErrorCarga(status
+          ? `No se pudieron cargar los préstamos (error ${status} de la API). Si la API se actualizó, reiniciala.`
+          : 'No se pudo conectar con la API.');
+      })
+      .finally(() => setCargando(false));
 
   useEffect(() => { cargar(); }, []);
 
@@ -173,6 +179,8 @@ function MapaPrestamos() {
           <p style={{ fontSize: 13, color: '#6B7C8C', margin: 0 }}>Ubicación de los equipos prestados actualmente</p>
         </div>
 
+        {errorCarga && <div style={bannerError}>⚠ {errorCarga}</div>}
+
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 16 }}>
           <span style={chipResumen}>🤝 {prestamos.length} préstamo(s) activo(s)</span>
           <span style={chipResumen}>🏥 {marcadores.length} hospital(es) en el mapa</span>
@@ -235,7 +243,7 @@ function MapaPrestamos() {
             {posicionSeleccionada && <Marker position={posicionSeleccionada} icon={iconoSeleccion} />}
           </MapContainer>
 
-          {!cargando && prestamos.length === 0 && (
+          {!cargando && !errorCarga && prestamos.length === 0 && (
             <div style={avisoSobreMapa}>No hay préstamos activos en este momento.</div>
           )}
         </div>
@@ -323,6 +331,7 @@ const errStyle = { display: 'block', color: '#E85A6D', fontSize: 11, marginTop: 
 const btnGhost = { background: 'white', color: '#6B7C8C', border: '1px solid #E5EDF3', padding: '8px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' };
 const btnSave = { background: 'linear-gradient(135deg, #2C7DA0 0%, #4A9BB8 100%)', color: 'white', border: 'none', padding: '9px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' };
 const btnChico = { background: '#F0F6FA', color: '#2C7DA0', border: 'none', borderRadius: 6, padding: '6px 10px', fontSize: 11, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' };
+const bannerError = { background: '#FDECEE', border: '1px solid #F5C2C7', color: '#842029', padding: '12px 14px', borderRadius: 10, fontSize: 13, marginTop: 14 };
 const avisoSobreMapa = { position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)', zIndex: 500, background: 'white', padding: '8px 14px', borderRadius: 8, boxShadow: '0 2px 10px rgba(0,0,0,0.15)', fontSize: 13, color: '#4A5868' };
 
 export default MapaPrestamos;

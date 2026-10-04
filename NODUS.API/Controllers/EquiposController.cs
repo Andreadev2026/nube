@@ -53,7 +53,15 @@ namespace NODUS.API.Controllers
                     },
                     Componentes = e.EquipoComponentes
                         .Select(c => c.Componente)
-                        .ToList()
+                        .ToList(),
+                    UbicacionActual = e.Prestamos
+                        .Where(p => p.Estado == "En préstamo" && p.FechaDevolucionReal == null)
+                        .Select(p => "Prestado a " + p.Hospital!.Nombre)
+                        .FirstOrDefault()
+                        ?? e.Ubicaciones
+                            .OrderByDescending(u => u.FechaTraslado).ThenByDescending(u => u.IdUbicacion)
+                            .Select(u => u.SectorNuevo!.Nombre)
+                            .FirstOrDefault()
                 })
                 .ToListAsync();
 

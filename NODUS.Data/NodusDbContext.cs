@@ -26,6 +26,8 @@ namespace NODUS.Data
         public DbSet<HospitalExterno> HospitalesExternos { get; set; }
         public DbSet<Prestamo> Prestamos { get; set; }
         public DbSet<PrestamoComponente> PrestamoComponentes { get; set; }
+        public DbSet<RemitoContador> RemitoContadores { get; set; }
+        public DbSet<ProrrogaPrestamo> ProrrogasPrestamo { get; set; }
 
         public NodusDbContext(DbContextOptions<NodusDbContext> options) : base(options) { }
 
@@ -147,10 +149,23 @@ namespace NODUS.Data
                 e.Property(x => x.IdPrestamo).HasColumnName("id_prestamo");
                 e.Property(x => x.FechaPrestamo).HasColumnName("fecha_prestamo").IsRequired();
                 e.Property(x => x.FechaEstimadaDevolucion).HasColumnName("fecha_estimada_devolucion");
+                e.Property(x => x.FechaEstimadaDevolucionOriginal).HasColumnName("fecha_estimada_devolucion_original");
                 e.Property(x => x.FechaDevolucionReal).HasColumnName("fecha_devolucion_real");
                 e.Property(x => x.Estado).HasColumnName("estado").HasMaxLength(30).IsRequired();
                 e.Property(x => x.Motivo).HasColumnName("motivo").HasMaxLength(100);
                 e.Property(x => x.Observaciones).HasColumnName("observaciones");
+                e.Property(x => x.NumeroRemito).HasColumnName("numero_remito").HasMaxLength(20).IsRequired();
+                e.Property(x => x.RutaRemitoPdf).HasColumnName("ruta_remito_pdf").HasMaxLength(300);
+                e.Property(x => x.FechaEmisionRemito).HasColumnName("fecha_emision_remito");
+                e.HasIndex(x => x.NumeroRemito).IsUnique();
+                e.Property(x => x.RutaRemitoSalidaFirmado).HasColumnName("ruta_remito_salida_firmado").HasMaxLength(300);
+                e.Property(x => x.FechaCargaFirmaSalida).HasColumnName("fecha_carga_firma_salida");
+                e.Property(x => x.NumeroRemitoDevolucion).HasColumnName("numero_remito_devolucion").HasMaxLength(20);
+                e.HasIndex(x => x.NumeroRemitoDevolucion).IsUnique();
+                e.Property(x => x.RutaRemitoDevolucionPdf).HasColumnName("ruta_remito_devolucion_pdf").HasMaxLength(300);
+                e.Property(x => x.ObservacionesDevolucion).HasColumnName("observaciones_devolucion");
+                e.Property(x => x.RutaRemitoDevolucionFirmado).HasColumnName("ruta_remito_devolucion_firmado").HasMaxLength(300);
+                e.Property(x => x.FechaCargaFirmaDevolucion).HasColumnName("fecha_carga_firma_devolucion");
                 e.Property(x => x.IdEquipo).HasColumnName("id_equipo");
                 e.Property(x => x.IdHospital).HasColumnName("id_hospital");
                 e.Property(x => x.IdUsuario).HasColumnName("id_usuario");
@@ -167,6 +182,30 @@ namespace NODUS.Data
                 e.Property(x => x.IdPrestamo).HasColumnName("id_prestamo");
                 e.Property(x => x.Componente).HasColumnName("componente").HasMaxLength(200).IsRequired();
                 e.HasOne(x => x.Prestamo).WithMany(p => p.PrestamoComponentes).HasForeignKey(x => x.IdPrestamo).OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // ── PRORROGA_PRESTAMO ──
+            modelBuilder.Entity<ProrrogaPrestamo>(e =>
+            {
+                e.ToTable("prorroga_prestamo"); e.HasKey(x => x.IdProrroga);
+                e.Property(x => x.IdProrroga).HasColumnName("id_prorroga");
+                e.Property(x => x.IdPrestamo).HasColumnName("id_prestamo");
+                e.Property(x => x.FechaAnterior).HasColumnName("fecha_anterior");
+                e.Property(x => x.FechaNueva).HasColumnName("fecha_nueva").IsRequired();
+                e.Property(x => x.Motivo).HasColumnName("motivo").HasMaxLength(300).IsRequired();
+                e.Property(x => x.FechaSolicitud).HasColumnName("fecha_solicitud").IsRequired();
+                e.Property(x => x.IdUsuario).HasColumnName("id_usuario");
+                e.HasOne(x => x.Prestamo).WithMany(p => p.Prorrogas).HasForeignKey(x => x.IdPrestamo).OnDelete(DeleteBehavior.Cascade);
+                e.HasOne(x => x.Usuario).WithMany().HasForeignKey(x => x.IdUsuario).OnDelete(DeleteBehavior.Restrict);
+            });
+
+            // ── REMITO_CONTADOR ──
+            modelBuilder.Entity<RemitoContador>(e =>
+            {
+                e.ToTable("remito_contador"); e.HasKey(x => new { x.Tipo, x.Anio });
+                e.Property(x => x.Tipo).HasColumnName("tipo").HasMaxLength(3);
+                e.Property(x => x.Anio).HasColumnName("anio").ValueGeneratedNever();
+                e.Property(x => x.UltimoNumero).HasColumnName("ultimo_numero").IsRequired();
             });
 
             // ── ORDEN_TRABAJO ──

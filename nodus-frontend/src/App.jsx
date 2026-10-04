@@ -25,6 +25,10 @@ import {
 } from '@tabler/icons-react';
 import api from './api';
 import { puedeVerModulo } from './permisos';
+import {
+  EVENTO_PRESTAMOS_ACTUALIZADOS, DIAS_AVISO, estaPorVencer,
+  EVENTO_EQUIPOS_ACTUALIZADOS, DIAS_AVISO_GARANTIA, garantiaPorVencer
+} from './vencimientos';
 import Login from './pages/Login';
 import Marcas from './pages/Marcas';
 import Activos from './pages/Activos';
@@ -44,6 +48,7 @@ import Reportes from './pages/Reportes';
 import Prestamos from './pages/Prestamos';
 import HospitalesExternos from './pages/HospitalesExternos';
 import MapaPrestamos from './pages/MapaPrestamos';
+import Remitos from './pages/Remitos';
 import FichaEquipo from './pages/FichaEquipo';
 import './App.css';
 
@@ -68,6 +73,7 @@ function Sidebar({ auth, onLogout, mobileOpen, onNavigate }) {
     '/prestamos': 'prestamos',
     '/hospitalesexternos': 'prestamos',
     '/mapaprestamos': 'prestamos',
+    '/remitos': 'prestamos',
     '/usuarios': 'admin'
   };
 
@@ -94,6 +100,48 @@ function Sidebar({ auth, onLogout, mobileOpen, onNavigate }) {
   const toggle = (mod) => {
     setAbiertos(prev => ({ ...prev, [mod]: !prev[mod] }));
   };
+
+  // Contador de préstamos por vencer: se recalcula al navegar y cuando la pantalla de Préstamos cambia datos
+  const veePrestamos = puedeVerModulo(rol, 'prestamos');
+  const [porVencer, setPorVencer] = useState(0);
+
+  useEffect(() => {
+    if (!veePrestamos) return;
+    api.get('/prestamos')
+      .then(r => setPorVencer(r.data.filter(estaPorVencer).length))
+      .catch(() => { /* si la API no responde, se deja el último valor conocido */ });
+  }, [veePrestamos, location.pathname]);
+
+  useEffect(() => {
+    const alActualizar = (e) => setPorVencer(e.detail.filter(estaPorVencer).length);
+    window.addEventListener(EVENTO_PRESTAMOS_ACTUALIZADOS, alActualizar);
+    return () => window.removeEventListener(EVENTO_PRESTAMOS_ACTUALIZADOS, alActualizar);
+  }, []);
+
+  const badgePorVencer = porVencer > 0 && (
+    <b className="sn-badge" title={`${porVencer} préstamo(s) vencen en los próximos ${DIAS_AVISO} días`}>{porVencer}</b>
+  );
+
+  // Contador de garantías por vencer: mismo mecanismo, con los datos de /equipos
+  const veePatrimonial = puedeVerModulo(rol, 'patrimonial');
+  const [garantiasPorVencer, setGarantiasPorVencer] = useState(0);
+
+  useEffect(() => {
+    if (!veePatrimonial) return;
+    api.get('/equipos')
+      .then(r => setGarantiasPorVencer(r.data.filter(garantiaPorVencer).length))
+      .catch(() => { /* si la API no responde, se deja el último valor conocido */ });
+  }, [veePatrimonial, location.pathname]);
+
+  useEffect(() => {
+    const alActualizar = (e) => setGarantiasPorVencer(e.detail.filter(garantiaPorVencer).length);
+    window.addEventListener(EVENTO_EQUIPOS_ACTUALIZADOS, alActualizar);
+    return () => window.removeEventListener(EVENTO_EQUIPOS_ACTUALIZADOS, alActualizar);
+  }, []);
+
+  const badgeGarantias = garantiasPorVencer > 0 && (
+    <b className="sn-badge" title={`${garantiasPorVencer} activo(s) con garantía que vence en los próximos ${DIAS_AVISO_GARANTIA} días`}>{garantiasPorVencer}</b>
+  );
 
   return (
     <aside className={`sidebar-nodus no-print${mobileOpen ? ' sn-open' : ''}`}>
@@ -123,12 +171,14 @@ function Sidebar({ auth, onLogout, mobileOpen, onNavigate }) {
             >
               <IconLayoutDashboard size={14} stroke={2} />
               <span>Gestión patrimonial</span>
+              {!abiertos.patrimonial && badgeGarantias}
             </div>
             {abiertos.patrimonial && (
               <div className="sn-group-content">
                 <NavLink to="/activos" className="sn-item">
                   <IconStethoscope size={16} stroke={2} />
                   <span>Activos</span>
+                  {badgeGarantias}
                 </NavLink>
                 <NavLink to="/ubicaciones" className="sn-item">
                   <IconMapPin size={16} stroke={2} />
@@ -208,12 +258,14 @@ function Sidebar({ auth, onLogout, mobileOpen, onNavigate }) {
             >
               <IconArrowsExchange size={14} stroke={2} />
               <span>Gestión de préstamos</span>
+              {!abiertos.prestamos && badgePorVencer}
             </div>
             {abiertos.prestamos && (
               <div className="sn-group-content">
                 <NavLink to="/prestamos" className="sn-item">
                   <IconArrowsExchange size={16} stroke={2} />
                   <span>Préstamos</span>
+                  {badgePorVencer}
                 </NavLink>
                 <NavLink to="/hospitalesexternos" className="sn-item">
                   <IconBuildingHospital size={16} stroke={2} />
@@ -222,6 +274,10 @@ function Sidebar({ auth, onLogout, mobileOpen, onNavigate }) {
                 <NavLink to="/mapaprestamos" className="sn-item">
                   <IconMap2 size={16} stroke={2} />
                   <span>Mapa de préstamos</span>
+                </NavLink>
+                <NavLink to="/remitos" className="sn-item">
+                  <IconFileText size={16} stroke={2} />
+                  <span>Remitos</span>
                 </NavLink>
               </div>
             )}
@@ -351,6 +407,7 @@ function App() {
             <Route path="/prestamos" element={<RutaProtegida auth={auth} modulo="prestamos"><Prestamos auth={auth} /></RutaProtegida>} />
             <Route path="/hospitalesexternos" element={<RutaProtegida auth={auth} modulo="prestamos"><HospitalesExternos /></RutaProtegida>} />
             <Route path="/mapaprestamos" element={<RutaProtegida auth={auth} modulo="prestamos"><MapaPrestamos /></RutaProtegida>} />
+            <Route path="/remitos" element={<RutaProtegida auth={auth} modulo="prestamos"><Remitos /></RutaProtegida>} />
             <Route path="*" element={<Navigate to="/" />} />
             <Route path="/reportes" element={<RutaProtegida auth={auth} modulo="reportes"><Reportes /></RutaProtegida>} />
             <Route path="/reportes/listados" element={<RutaProtegida auth={auth} modulo="reportes"><Reportes /></RutaProtegida>} />

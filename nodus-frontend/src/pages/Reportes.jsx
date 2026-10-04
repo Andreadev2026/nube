@@ -15,6 +15,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import html2canvas from 'html2canvas';
+import { estaVencido, diasAtraso, prorrogasConVencido } from '../vencimientos';
 
 const AZUL = '#0C447C';
 const AZUL_MEDIO = '#2C7DA0';
@@ -23,6 +24,10 @@ const NARANJA = '#A37715';
 const ROJO = '#B93B1B';
 const VIOLETA = '#5e51d6';
 const TEAL = '#0F9E8E';
+
+// Promedio con un decimal (0 si no hay valores)
+const promedio = (valores) => valores.length === 0 ? 0 : Math.round((valores.reduce((a, v) => a + v, 0) / valores.length) * 10) / 10;
+const fmtDias = (v) => v.toLocaleString('es-AR', { maximumFractionDigits: 1 });
 
 // Input custom compacto para los DatePicker del panel de filtros
 const CustomDateInputMini = forwardRef(({ value, onClick, placeholder }, ref) => (
@@ -274,9 +279,22 @@ function Reportes() {
 
   // ─── KPIs de Préstamos ───
   const prestamosActivos = useMemo(() => prestamos.filter(p => p.estado === 'En préstamo'), [prestamos]);
-  const prestamosVencidos = useMemo(() =>
-    prestamosActivos.filter(p => p.fechaEstimadaDevolucion && new Date(p.fechaEstimadaDevolucion) < new Date()),
-    [prestamosActivos]
+  const prestamosVencidos = useMemo(() => prestamosActivos.filter(estaVencido), [prestamosActivos]);
+
+  // ─── Cumplimiento de devoluciones: atraso contra la fecha estimada vigente (con prórrogas), más el
+  // acumulado antes de cada prórroga pedida con el préstamo ya vencido. Incluye los devueltos tarde y los
+  // que siguen vencidos; todo el historial, sin filtro de período.
+  const prestamosConAtraso = useMemo(() =>
+    prestamos.map(p => ({ ...p, diasAtraso: diasAtraso(p) })).filter(p => p.diasAtraso > 0),
+    [prestamos]
+  );
+  const promedioDiasAtraso = promedio(prestamosConAtraso.map(p => p.diasAtraso));
+  // Por mes: préstamos devueltos tarde en ese mes; en el mes actual se suman los que siguen vencidos
+  const sparkAtraso = useMemo(() =>
+    meses.map((m, i) => promedio(prestamosConAtraso
+      .filter(p => p.fechaDevolucionReal ? p.fechaDevolucionReal.slice(0, 7) === m.key : i === meses.length - 1)
+      .map(p => p.diasAtraso))),
+    [meses, prestamosConAtraso]
   );
   const sparkTiempo = useMemo(() =>
     meses.map(m => {
@@ -441,6 +459,49 @@ function Reportes() {
       .filter(r => !q || [r.equipo, r.nroSerie, r.hospital, r.motivo].join(' ').toLowerCase().includes(q));
   }, [prestamos, busquedaListado]);
 
+  const cumplimientoHospitalListado = useMemo(() => {
+    const q = busquedaListado.trim().toLowerCase();
+    const map = {};
+    prestamos.forEach(p => {
+      const g = map[p.idHospital] ??= { hospital: p.hospital?.nombre || '—', total: 0, atrasos: [] };
+      g.total++;
+      const dias = diasAtraso(p);
+      if (dias > 0) g.atrasos.push(dias);
+    });
+    return Object.values(map)
+      .map(g => ({
+        hospital: g.hospital,
+        total: g.total,
+        vencidos: g.atrasos.length,
+        pctVencidos: `${Math.round((g.atrasos.length / g.total) * 100)}%`,
+        promedio: g.atrasos.length > 0 ? fmtDias(promedio(g.atrasos)) : '—'
+      }))
+      .filter(r => !q || r.hospital.toLowerCase().includes(q))
+      .sort((a, b) => b.vencidos - a.vencidos || a.hospital.localeCompare(b.hospital));
+  }, [prestamos, busquedaListado]);
+
+  const prestamosAtrasoListado = useMemo(() => {
+    const q = busquedaListado.trim().toLowerCase();
+    return prestamosConAtraso
+      .map(p => ({
+        equipo: p.equipo?.modelo || '—',
+        nroSerie: p.equipo?.nroSerie || '—',
+        hospital: p.hospital?.nombre || '—',
+        apertura: p.fechaPrestamo?.split('T')[0] || '—',
+        // Préstamos anteriores al campo "original": la pactada es la anterior a la primera prórroga
+        original: (p.fechaEstimadaDevolucionOriginal || p.prorrogas?.[0]?.fechaAnterior || p.fechaEstimadaDevolucion)?.split('T')[0] || '—',
+        vigente: p.fechaEstimadaDevolucion?.split('T')[0] || '—',
+        cierre: p.fechaDevolucionReal?.split('T')[0] || '—',
+        dias: p.diasAtraso,
+        prorrogas: p.prorrogas?.length > 0
+          ? `Sí (${p.prorrogas.length})${prorrogasConVencido(p) > 0 ? ` · ${prorrogasConVencido(p)} con vencido` : ''}`
+          : 'No',
+        estado: p.fechaDevolucionReal ? 'Devuelto' : estaVencido(p) ? 'En préstamo (vencido)' : 'En préstamo'
+      }))
+      .filter(r => !q || [r.equipo, r.nroSerie, r.hospital].join(' ').toLowerCase().includes(q))
+      .sort((a, b) => b.dias - a.dias);
+  }, [prestamosConAtraso, busquedaListado]);
+
   // ─── Rango de fechas para el header ───
   const rangoLabel = useMemo(() => {
     const finLbl = fechaFin.toLocaleDateString('es-AR');
@@ -585,12 +646,25 @@ function Reportes() {
     insumos: {
       titulo: 'Listado de Insumos',
       columnas: ['Insumo', 'Stock actual', 'Stock mínimo', 'Estado'],
-      filas: insumosListado.map(r => [r.nombre, r.actual, r.minimo, r.estadoStock])
+      filas: insumosListado.map(r => [r.nombre, r.actual, r.minimo, r.estadoStock]),
+      resaltar: (j, val) => j === 3 && val === 'Bajo'
     },
     prestamos: {
       titulo: 'Listado de Préstamos',
       columnas: ['Equipo', 'N° Serie', 'Hospital', 'Motivo', 'Fecha préstamo', 'Devol. estimada', 'Devol. real', 'Estado'],
       filas: prestamosListado.map(r => [r.equipo, r.nroSerie, r.hospital, r.motivo, r.apertura, r.estimada, r.cierre, r.estado])
+    },
+    cumplimiento: {
+      titulo: 'Cumplimiento de Préstamos por Hospital',
+      columnas: ['Hospital', 'Préstamos totales', 'Vencidos', '% vencidos', 'Promedio días de atraso'],
+      filas: cumplimientoHospitalListado.map(r => [r.hospital, r.total, r.vencidos, r.pctVencidos, r.promedio]),
+      resaltar: (j, val) => j === 2 && val > 0
+    },
+    atrasos: {
+      titulo: 'Préstamos con Atraso',
+      columnas: ['Equipo', 'N° Serie', 'Hospital', 'Fecha préstamo', 'Devol. original', 'Devol. vigente', 'Devol. real', 'Días de atraso', 'Prórrogas', 'Estado'],
+      filas: prestamosAtrasoListado.map(r => [r.equipo, r.nroSerie, r.hospital, r.apertura, r.original, r.vigente, r.cierre, r.dias, r.prorrogas, r.estado]),
+      resaltar: (j) => j === 7
     }
   };
 
@@ -792,12 +866,16 @@ function Reportes() {
 
             {/* ══ SECCIÓN: Gestión de Préstamos ══ */}
             <SeccionTitulo titulo="Gestión de Préstamos" />
-            <div className="rwd-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 28 }}>
+            <div className="rwd-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 28 }}>
               <KPICardSpark icono="🤝" iconoBg="#E6F1FB" label="Préstamos activos" valor={prestamosActivos.length}
                 sub="En curso actualmente" subColor="#6B7C8C" color={AZUL_MEDIO} sparkData={sparkPrestamosActivos} />
               <KPICardSpark icono="⏰" iconoBg="#FAECE7" label="Préstamos vencidos" valor={prestamosVencidos.length}
                 sub={prestamosVencidos.length > 0 ? 'Requieren seguimiento' : 'Sin vencimientos'}
                 subColor={prestamosVencidos.length > 0 ? ROJO : VERDE} color={ROJO} sparkData={sparkPrestamosActivos} />
+              <KPICardSpark icono="📉" iconoBg="#FAEEDA" label="Promedio días de atraso"
+                valor={prestamosConAtraso.length > 0 ? `${fmtDias(promedioDiasAtraso)} ${promedioDiasAtraso === 1 ? 'día' : 'días'}` : '0 días'}
+                sub={prestamosConAtraso.length > 0 ? `Sobre ${prestamosConAtraso.length} ${prestamosConAtraso.length === 1 ? 'préstamo' : 'préstamos'} con atraso` : 'Todas las devoluciones a término'}
+                subColor={prestamosConAtraso.length > 0 ? NARANJA : VERDE} color={NARANJA} sparkData={sparkAtraso} />
             </div>
 
             {/* ══ SECCIÓN: Gestión de Insumos ══ */}
@@ -850,7 +928,9 @@ function Reportes() {
               { val: 'activos', label: '📦 Activos' },
               { val: 'ots', label: '🔧 Órdenes de trabajo' },
               { val: 'insumos', label: '🧪 Insumos' },
-              { val: 'prestamos', label: '🤝 Préstamos' }
+              { val: 'prestamos', label: '🤝 Préstamos' },
+              { val: 'cumplimiento', label: '⏰ Cumplimiento por hospital' },
+              { val: 'atrasos', label: '⚠ Préstamos con atraso' }
             ].map(op => (
               <button
                 key={op.val}
@@ -904,13 +984,16 @@ function Reportes() {
                     <tr><td colSpan={CONFIG_LISTADOS[listadoTipo].columnas.length} style={{ textAlign: 'center', padding: 24, color: '#C4C9D1' }}>Sin resultados</td></tr>
                   ) : CONFIG_LISTADOS[listadoTipo].filas.map((fila, i) => (
                     <tr key={i} style={{ borderBottom: '1px solid #F8FAFC' }}>
-                      {fila.map((val, j) => (
-                        <td key={j} style={{
-                          padding: '8px 10px', color: listadoTipo === 'insumos' && j === 3 && val === 'Bajo' ? ROJO : '#2D3748',
-                          fontWeight: listadoTipo === 'insumos' && j === 3 && val === 'Bajo' ? 600 : 400,
-                          whiteSpace: 'nowrap'
-                        }}>{val}</td>
-                      ))}
+                      {fila.map((val, j) => {
+                        const resaltado = CONFIG_LISTADOS[listadoTipo].resaltar?.(j, val);
+                        return (
+                          <td key={j} style={{
+                            padding: '8px 10px', color: resaltado ? ROJO : '#2D3748',
+                            fontWeight: resaltado ? 600 : 400,
+                            whiteSpace: 'nowrap'
+                          }}>{val}</td>
+                        );
+                      })}
                     </tr>
                   ))}
                 </tbody>
