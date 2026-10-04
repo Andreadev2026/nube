@@ -1,6 +1,9 @@
 **/bin/
 **/obj/
 **/node_modules/
+**/dist/
 .vs/
 .git/
+.env
 nodus-frontend/
+NODUS.WPF/

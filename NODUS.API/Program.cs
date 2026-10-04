@@ -7,11 +7,13 @@ using NODUS.Data;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Railway asigna el puerto dinámicamente vía PORT; localmente se usa 5085
+// Railway asigna el puerto dinámicamente vía PORT. Docker Compose y "dotnet run" (launchSettings)
+// definen ASPNETCORE_URLS, que se respeta. Sin ninguna de las dos, se usa 5085.
 var port = Environment.GetEnvironmentVariable("PORT");
-builder.WebHost.UseUrls(string.IsNullOrEmpty(port)
-    ? "http://localhost:5085"
-    : $"http://0.0.0.0:{port}");
+if (!string.IsNullOrEmpty(port))
+    builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
+else if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("ASPNETCORE_URLS")))
+    builder.WebHost.UseUrls("http://0.0.0.0:5085");
 
 // Railway provee DATABASE_URL (postgres://user:pass@host:port/db); si existe, tiene prioridad
 // sobre appsettings.json. ConnectionStrings__NodusDB y Jwt__Key se toman solos de las variables de entorno.
@@ -88,6 +90,26 @@ builder.Services.AddCors(options =>
 });
 
 var app = builder.Build();
+
+// Se aplican las migraciones al iniciar (en Docker y Railway la base arranca vacía).
+// Con reintentos porque el contenedor de PostgreSQL puede tardar en aceptar conexiones.
+const int intentosMigracion = 10;
+for (var intento = 1; ; intento++)
+{
+    try
+    {
+        using var scope = app.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<NodusDbContext>();
+        db.Database.Migrate();
+        break;
+    }
+    catch (Exception ex) when (intento < intentosMigracion)
+    {
+        app.Logger.LogWarning("No se pudo migrar la base (intento {Intento}/{Total}): {Mensaje}. Reintentando en 5 s...",
+            intento, intentosMigracion, ex.Message);
+        Thread.Sleep(TimeSpan.FromSeconds(5));
+    }
+}
 
 if (app.Environment.IsDevelopment())
 {

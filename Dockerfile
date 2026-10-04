@@ -20,8 +20,8 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
 COPY --from=build /app/publish .
 
-# Railway sobrescribe PORT; este valor solo aplica al correr la imagen localmente
-ENV PORT=8080
+# Docker Compose lo vuelve a definir; en Railway la variable PORT tiene prioridad (ver Program.cs)
+ENV ASPNETCORE_URLS=http://+:8080
 EXPOSE 8080
 
 ENTRYPOINT ["dotnet", "NODUS.API.dll"]
