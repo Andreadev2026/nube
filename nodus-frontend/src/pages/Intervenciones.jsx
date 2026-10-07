@@ -80,6 +80,7 @@ function Intervenciones() {
   const [tiempoEmpleado, setTiempoEmpleado] = useState('');
   const [resultadoSegElectrica, setResultadoSegElectrica] = useState('');
   const [fecha, setFecha] = useState(hoy);
+  const [fechaFin, setFechaFin] = useState('');
   const [idOT, setIdOT] = useState('');
   const [idUsuario, setIdUsuario] = useState('');
   const [editando, setEditando] = useState(null);
@@ -189,6 +190,7 @@ function Intervenciones() {
     setTiempoEmpleado(i.tiempoEmpleado.toString());
     setResultadoSegElectrica(i.resultadoSegElectrica);
     setFecha(i.fecha?.split('T')[0] || '');
+    setFechaFin(i.fechaFin?.split('T')[0] || '');
     setIdOT(i.idOT);
     setIdUsuario(i.idUsuario);
     setEditando(i.idIntervencion);
@@ -199,8 +201,12 @@ function Intervenciones() {
 
   const validar = () => {
     const errs = {};
-    if (!fecha) errs.fecha = 'Falta la fecha de la intervención';
+    if (!fecha) errs.fecha = 'Falta la fecha de inicio';
     else if (fecha > hoy) errs.fecha = 'La fecha no puede ser futura';
+    if (fechaFin) {
+      if (fechaFin > hoy) errs.fechaFin = 'La fecha no puede ser futura';
+      else if (fecha && fechaFin < fecha) errs.fechaFin = 'La fecha de fin no puede ser anterior a la de inicio';
+    }
     if (!idOT) errs.idOT = 'Falta seleccionar la OT asociada';
     if (!idUsuario) errs.idUsuario = 'Falta seleccionar el técnico responsable';
     if (!tiempoEmpleado) errs.tiempoEmpleado = 'Falta el tiempo empleado';
@@ -227,18 +233,19 @@ function Intervenciones() {
       tiempoEmpleado: parseInt(tiempoEmpleado),
       resultadoSegElectrica,
       fecha,
+      fechaFin: fechaFin || null,
       idOT: parseInt(idOT),
       idUsuario: parseInt(idUsuario),
     };
     try {
-      if (editando) {
-        await api.put(`/intervenciones/${editando}`, { idIntervencion: editando, ...data });
-      } else {
-        await api.post('/intervenciones', data);
-      }
+      const r = editando
+        ? await api.put(`/intervenciones/${editando}`, { idIntervencion: editando, ...data })
+        : await api.post('/intervenciones', data);
       cerrarModal();
       cargarIntervenciones();
       cargarOTs();
+      // Aviso del backend, por ejemplo cuando hay fecha de fin pero la OT no se pudo cerrar (US-10)
+      if (r.data?.mensaje) alert(r.data.mensaje);
     } catch (err) {
       const mensaje = typeof err.response?.data === 'string'
         ? err.response.data
@@ -249,7 +256,7 @@ function Intervenciones() {
 
   const limpiar = () => {
     setTareasRealizadas(''); setTiempoEmpleado(''); setResultadoSegElectrica('');
-    setFecha(''); setIdOT(''); setIdUsuario(''); setEditando(null);
+    setFecha(''); setFechaFin(''); setIdOT(''); setIdUsuario(''); setEditando(null);
     setErrores({}); setBuscadorOT(''); setMostrarListaOT(false);
   };
 
@@ -399,7 +406,7 @@ function Intervenciones() {
                       transform: expandido ? 'rotate(90deg)' : 'rotate(0deg)',
                       transition: 'transform 0.15s', fontSize: 10, color: '#9E9CBB'
                     }}>▶</span>
-                    <span>Fecha:</span>
+                    <span>Fecha de inicio:</span>
                     <strong>{fmtFecha(fecha)}</strong>
                     <span style={{ marginLeft: 'auto', color: '#9E9CBB', fontSize: 11 }}>
                       {lista.length}
@@ -460,11 +467,14 @@ function Intervenciones() {
                     ? seleccionada.tareasRealizadas.substring(0, 80) + '...'
                     : seleccionada.tareasRealizadas || 'Sin descripción'}
                 </h1>
-                <button
-                  onClick={() => abrirModalEditar(seleccionada)}
-                  className="btn-edit" title="Editar tarea"
-                  style={{ flexShrink: 0, marginLeft: 14 }}
-                >✏</button>
+                {/* Las tareas de una OT cerrada o anulada no se editan (PBI-05) */}
+                {!['Cerrada', 'Anulada'].includes(seleccionada.ordenTrabajo?.estado) && (
+                  <button
+                    onClick={() => abrirModalEditar(seleccionada)}
+                    className="btn-edit" title="Editar tarea"
+                    style={{ flexShrink: 0, marginLeft: 14 }}
+                  >✏</button>
+                )}
               </div>
 
               <h3 style={{ fontSize: 14, fontWeight: 600, color: '#1a1a1a', margin: '24px 0 12px', fontStyle: 'italic' }}>
@@ -517,8 +527,11 @@ function Intervenciones() {
                     fontSize: 12, fontWeight: 500
                   }}>{seleccionada.resultadoSegElectrica}</span>
                 </FilaDetalle>
-                <FilaDetalle label="Fecha">
+                <FilaDetalle label="Fecha de inicio">
                   📅 {fmtFecha(seleccionada.fecha?.split('T')[0])}
+                </FilaDetalle>
+                <FilaDetalle label="Fecha de fin">
+                  {seleccionada.fechaFin ? <>📅 {fmtFecha(seleccionada.fechaFin.split('T')[0])}</> : '—'}
                 </FilaDetalle>
               </div>
 
@@ -715,7 +728,7 @@ function Intervenciones() {
               <SeccionTitulo icono="📋" titulo="Datos de la intervención" />
               <div className="rwd-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 22 }}>
                 <div>
-             <label style={lblStyle}>Fecha *</label>
+                  <label style={lblStyle}>Fecha de inicio *</label>
                   <DatePicker
                     selected={fecha ? new Date(fecha + 'T00:00:00') : null}
                     onChange={(date) => {
@@ -733,6 +746,32 @@ function Intervenciones() {
                   {errores.fecha && <span style={errStyle}>⚠ {errores.fecha}</span>}
                 </div>
                 <div>
+                  <label style={lblStyle}>Fecha de fin</label>
+                  <DatePicker
+                    selected={fechaFin ? new Date(fechaFin + 'T00:00:00') : null}
+                    onChange={(date) => {
+                      if (date) {
+                        const yyyy = date.getFullYear();
+                        const mm = String(date.getMonth() + 1).padStart(2, '0');
+                        const dd = String(date.getDate()).padStart(2, '0');
+                        cambiarCampo('fechaFin', `${yyyy}-${mm}-${dd}`, setFechaFin);
+                      }
+                    }}
+                    dateFormat="dd/MM/yyyy"
+                    minDate={fecha ? new Date(fecha + 'T00:00:00') : null}
+                    maxDate={new Date()}
+                    customInput={<CustomDateInput />}
+                  />
+                  {fechaFin && (
+                    <button
+                      type="button"
+                      onClick={() => cambiarCampo('fechaFin', '', setFechaFin)}
+                      style={{ background: 'none', border: 'none', padding: '4px 0 0', color: '#6B7C8C', fontSize: 11, cursor: 'pointer' }}
+                    >✕ Quitar fecha de fin</button>
+                  )}
+                  {errores.fechaFin && <span style={errStyle}>⚠ {errores.fechaFin}</span>}
+                </div>
+                <div>
                   <label style={lblStyle}>Tiempo empleado (minutos) *</label>
                   <input
                     type="number" min="1" max="480"
@@ -743,7 +782,7 @@ function Intervenciones() {
                   />
                   {errores.tiempoEmpleado && <span style={errStyle}>⚠ {errores.tiempoEmpleado}</span>}
                 </div>
-                <div style={{ gridColumn: '1 / -1' }}>
+                <div>
                   <label style={lblStyle}>Técnico responsable *</label>
                   <select
                     value={idUsuario}
@@ -785,7 +824,7 @@ function Intervenciones() {
               </div>
               {errores.resultadoSegElectrica && <span style={errStyle}>⚠ {errores.resultadoSegElectrica}</span>}
               <small style={{ display: 'block', marginTop: 8, fontSize: 11, color: '#9E9CBB', fontStyle: 'italic' }}>
-                Solo el resultado "Aprobado" habilita el cierre de la OT (US-10 · Riesgo Eléctrico Crítico).
+                Al cargar la fecha de fin, la OT se cierra solo si el resultado es "Aprobado" (US-10 · Riesgo Eléctrico Crítico).
               </small>
 
               {/* SECCIÓN 4: TAREAS REALIZADAS */}

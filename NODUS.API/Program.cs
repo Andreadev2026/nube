@@ -47,6 +47,7 @@ builder.Services.AddDbContext<NodusDbContext>(options =>
 QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
 builder.Services.AddSingleton<AlmacenamientoService>();
 builder.Services.AddScoped<RemitoService>();
+builder.Services.AddScoped<EstadosOTService>();
 
 // Nominatim exige un User-Agent que identifique a la aplicación
 builder.Services.AddHttpClient<GeocodingService>(client =>

@@ -235,6 +235,7 @@ namespace NODUS.Data
                 e.Property(x => x.TiempoEmpleado).HasColumnName("tiempo_empleado").IsRequired();
                 e.Property(x => x.ResultadoSegElectrica).HasColumnName("resultado_seg_electrica").HasMaxLength(100).IsRequired();
                 e.Property(x => x.Fecha).HasColumnName("fecha").IsRequired();
+                e.Property(x => x.FechaFin).HasColumnName("fecha_fin");
                 e.Property(x => x.IdOT).HasColumnName("id_ot");
                 e.Property(x => x.IdUsuario).HasColumnName("id_usuario");
                 e.HasOne(x => x.OrdenTrabajo).WithMany(ot => ot.Intervenciones).HasForeignKey(x => x.IdOT).OnDelete(DeleteBehavior.Restrict);

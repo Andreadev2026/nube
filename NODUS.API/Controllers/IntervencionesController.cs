@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using NODUS.API.Services;
 using NODUS.Data;
 using NODUS.Models;
 
@@ -10,6 +11,7 @@ namespace NODUS.API.Controllers
     public class IntervencionesController : ControllerBase
     {
         private readonly NodusDbContext _db;
+        private readonly EstadosOTService _estados;
 
         private static readonly string[] RESULTADOS_VALIDOS = {
             "Aprobado",
@@ -18,9 +20,13 @@ namespace NODUS.API.Controllers
             "No aplica"
         };
 
-        public IntervencionesController(NodusDbContext db)
+        private const string MSJ_OT_FINALIZADA =
+            "No se pueden registrar ni modificar tareas en una OT cerrada o anulada.";
+
+        public IntervencionesController(NodusDbContext db, EstadosOTService estados)
         {
             _db = db;
+            _estados = estados;
         }
 
         // GET: api/intervenciones
@@ -71,32 +77,23 @@ namespace NODUS.API.Controllers
             if (!RESULTADOS_VALIDOS.Contains(i.ResultadoSegElectrica))
                 return BadRequest($"Resultado inválido. Valores permitidos: {string.Join(", ", RESULTADOS_VALIDOS)}.");
 
-            // La OT tiene que existir y no estar anulada
-            var ot = await _db.OrdenesTrabajo.FindAsync(i.IdOT);
+            // La OT tiene que existir y seguir abierta
+            var ot = await _db.OrdenesTrabajo.AsNoTracking().FirstOrDefaultAsync(o => o.IdOT == i.IdOT);
             if (ot == null) return BadRequest("La OT seleccionada no existe.");
-            if (ot.Estado == "Anulada")
-                return BadRequest("No se pueden registrar intervenciones en una OT anulada.");
+            if (!EstadosOTService.EsAbierta(ot.Estado)) return BadRequest(MSJ_OT_FINALIZADA);
 
-            i.Fecha = DateTime.SpecifyKind(i.Fecha, DateTimeKind.Utc);
+            NormalizarFechas(i);
+            var error = ValidarFechas(i, ot);
+            if (error != null) return BadRequest(error);
 
-            // REGLA DE NEGOCIO: la intervención no puede ser anterior a la apertura de la OT
-            if (i.Fecha.Date < ot.FechaApertura.Date)
-                return BadRequest($"La fecha de la intervención ({i.Fecha:dd/MM/yyyy}) no puede ser anterior a la apertura de la OT ({ot.FechaApertura:dd/MM/yyyy}).");
-
-            // REGLA DE NEGOCIO: si la OT ya está cerrada, no aceptar intervenciones posteriores al cierre
-            if (ot.FechaCierre.HasValue && i.Fecha.Date > ot.FechaCierre.Value.Date)
-                return BadRequest($"La fecha de la intervención ({i.Fecha:dd/MM/yyyy}) no puede ser posterior al cierre de la OT ({ot.FechaCierre.Value:dd/MM/yyyy}).");
-
-            // REGLA DE NEGOCIO: si la OT estaba "Pendiente", pasa a "En curso"
-            if (ot.Estado == "Pendiente")
-            {
-                ot.Estado = "En curso";
-            }
-
+            // La tarea, el estado de la OT y el del equipo se guardan juntos
+            await using var tx = await _db.Database.BeginTransactionAsync();
             _db.Intervenciones.Add(i);
             await _db.SaveChangesAsync();
+            var aviso = await _estados.RecalcularEstadoOT(i.IdOT);
+            await tx.CommitAsync();
 
-            return CreatedAtAction(nameof(GetIntervencion), new { id = i.IdIntervencion }, i);
+            return CreatedAtAction(nameof(GetIntervencion), new { id = i.IdIntervencion }, new { intervencion = i, mensaje = aviso });
         }
 
         // PUT: api/intervenciones/5
@@ -109,27 +106,31 @@ namespace NODUS.API.Controllers
             if (!RESULTADOS_VALIDOS.Contains(i.ResultadoSegElectrica))
                 return BadRequest("Resultado inválido.");
 
-            i.Fecha = DateTime.SpecifyKind(i.Fecha, DateTimeKind.Utc);
+            var anterior = await _db.Intervenciones.AsNoTracking().FirstOrDefaultAsync(x => x.IdIntervencion == id);
+            if (anterior == null) return NotFound();
 
-            // REGLA: validar coherencia de fechas con la OT (al editar también)
+            // PBI-05: las tareas de una OT finalizada no se modifican (ni se mueven a una)
+            var otAnterior = await _db.OrdenesTrabajo.AsNoTracking().FirstAsync(o => o.IdOT == anterior.IdOT);
+            if (!EstadosOTService.EsAbierta(otAnterior.Estado)) return BadRequest(MSJ_OT_FINALIZADA);
+
             var ot = await _db.OrdenesTrabajo.AsNoTracking().FirstOrDefaultAsync(o => o.IdOT == i.IdOT);
             if (ot == null) return BadRequest("La OT asociada no existe.");
-            if (i.Fecha.Date < ot.FechaApertura.Date)
-                return BadRequest($"La fecha de la intervención ({i.Fecha:dd/MM/yyyy}) no puede ser anterior a la apertura de la OT ({ot.FechaApertura:dd/MM/yyyy}).");
-            if (ot.FechaCierre.HasValue && i.Fecha.Date > ot.FechaCierre.Value.Date)
-                return BadRequest($"La fecha de la intervención ({i.Fecha:dd/MM/yyyy}) no puede ser posterior al cierre de la OT ({ot.FechaCierre.Value:dd/MM/yyyy}).");
+            if (!EstadosOTService.EsAbierta(ot.Estado)) return BadRequest(MSJ_OT_FINALIZADA);
+
+            NormalizarFechas(i);
+            var error = ValidarFechas(i, ot);
+            if (error != null) return BadRequest(error);
 
             _db.Entry(i).State = EntityState.Modified;
 
-            try { await _db.SaveChangesAsync(); }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!await _db.Intervenciones.AnyAsync(x => x.IdIntervencion == id))
-                    return NotFound();
-                throw;
-            }
+            await using var tx = await _db.Database.BeginTransactionAsync();
+            await _db.SaveChangesAsync();
+            var aviso = await _estados.RecalcularEstadoOT(i.IdOT);
+            if (anterior.IdOT != i.IdOT)
+                await _estados.RecalcularEstadoOT(anterior.IdOT);
+            await tx.CommitAsync();
 
-            return NoContent();
+            return Ok(new { mensaje = aviso });
         }
 
         // DELETE: api/intervenciones/5
@@ -139,9 +140,33 @@ namespace NODUS.API.Controllers
             var i = await _db.Intervenciones.FindAsync(id);
             if (i == null) return NotFound();
 
+            var ot = await _db.OrdenesTrabajo.AsNoTracking().FirstAsync(o => o.IdOT == i.IdOT);
+            if (!EstadosOTService.EsAbierta(ot.Estado)) return BadRequest(MSJ_OT_FINALIZADA);
+
+            await using var tx = await _db.Database.BeginTransactionAsync();
             _db.Intervenciones.Remove(i);
             await _db.SaveChangesAsync();
+            await _estados.RecalcularEstadoOT(i.IdOT);
+            await tx.CommitAsync();
             return NoContent();
+        }
+
+        private static void NormalizarFechas(Intervencion i)
+        {
+            i.Fecha = DateTime.SpecifyKind(i.Fecha, DateTimeKind.Utc);
+            if (i.FechaFin.HasValue)
+                i.FechaFin = DateTime.SpecifyKind(i.FechaFin.Value, DateTimeKind.Utc);
+        }
+
+        // REGLAS DE NEGOCIO: la tarea no empieza antes de la apertura de la OT
+        // y la fecha de fin no es anterior a la de inicio
+        private static string? ValidarFechas(Intervencion i, OrdenTrabajo ot)
+        {
+            if (i.Fecha.Date < ot.FechaApertura.Date)
+                return $"La fecha de inicio de la tarea ({i.Fecha:dd/MM/yyyy}) no puede ser anterior a la apertura de la OT ({ot.FechaApertura:dd/MM/yyyy}).";
+            if (i.FechaFin.HasValue && i.FechaFin.Value.Date < i.Fecha.Date)
+                return $"La fecha de fin ({i.FechaFin.Value:dd/MM/yyyy}) no puede ser anterior a la fecha de inicio ({i.Fecha:dd/MM/yyyy}).";
+            return null;
         }
     }
 }

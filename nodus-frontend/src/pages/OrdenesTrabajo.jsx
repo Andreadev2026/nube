@@ -63,7 +63,6 @@ const ESTADOS = [
 ];
 
 // "Anulada" se sigue listando para las OT ya guardadas, pero no se ofrece en el formulario
-const ESTADOS_SELECCIONABLES = ESTADOS.filter(e => e.nombre !== 'Anulada');
 
 const ID_ESTADO_BAJA_PATRIMONIAL = 5;
 
@@ -88,7 +87,6 @@ function OrdenesTrabajo() {
   const [tipo, setTipo] = useState('');
   const [sintoma, setSintoma] = useState('');
   const [estado, setEstado] = useState('Pendiente');
-  const [fechaCierre, setFechaCierre] = useState('');
   const [idEquipo, setIdEquipo] = useState('');
   const [idServicio, setIdServicio] = useState('');
   const [idUsuario, setIdUsuario] = useState('');
@@ -205,7 +203,6 @@ function OrdenesTrabajo() {
     setTipo(o.tipo);
     setSintoma(o.sintoma);
     setEstado(o.estado);
-    setFechaCierre(o.fechaCierre?.split('T')[0] || '');
     setIdEquipo(o.idEquipo);
     setIdServicio(o.idServicio);
     setIdUsuario(o.idUsuario);
@@ -232,15 +229,6 @@ function OrdenesTrabajo() {
     if (equipoInhabilitado(equipoSel)) {
       errs.idEquipo = 'Error: Equipo inactivo por baja técnica definitiva';
     }
-
-    // US-10 validación en frontend
-    if (editando && estado === 'Cerrada') {
-      const otOriginal = ots.find(o => o.idOT === editando);
-      const yaEstabaCerrada = otOriginal?.estado === 'Cerrada';
-      if (!yaEstabaCerrada && !tieneSegElectricaAprobada(editando)) {
-        errs.__us10 = 'Acción Denegada: Es obligatorio registrar el resultado de seguridad eléctrica antes de cerrar la OT';
-      }
-    }
     return errs;
   };
 
@@ -254,8 +242,6 @@ function OrdenesTrabajo() {
       fechaApertura,
       tipo,
       sintoma: sintoma.trim(),
-      estado,
-      fechaCierre: fechaCierre || null,
       idEquipo: parseInt(idEquipo),
       idServicio: parseInt(idServicio),
       idUsuario: parseInt(idUsuario),
@@ -280,7 +266,7 @@ function OrdenesTrabajo() {
 
   const limpiar = () => {
     setFechaApertura(''); setTipo(''); setSintoma(''); setEstado('Pendiente');
-    setFechaCierre(''); setIdEquipo(''); setIdServicio(''); setIdUsuario('');
+    setIdEquipo(''); setIdServicio(''); setIdUsuario('');
     setEditando(null); setErrores({});
     setBuscadorEquipo(''); setMostrarLista(false);
   };
@@ -340,13 +326,6 @@ function OrdenesTrabajo() {
     const [y, m, d] = fecha.split('-');
     return `${d}/${m}/${y}`;
   };
-
-  const puedeCerrarseAhora = useMemo(() => {
-    if (!editando || estado !== 'Cerrada') return true;
-    const otOriginal = ots.find(o => o.idOT === editando);
-    if (otOriginal?.estado === 'Cerrada') return true;
-    return tieneSegElectricaAprobada(editando);
-  }, [editando, estado, intervenciones, ots]);
 
   const inpStyleErr = (campo) => ({
     ...inpStyle,
@@ -626,23 +605,6 @@ function OrdenesTrabajo() {
                 </div>
               )}
 
-              {errores.__us10 && (
-                <div style={{
-                  background: 'linear-gradient(90deg, #FEF2F3 0%, #FDECEE 100%)',
-                  border: '1px solid #F5C2C7',
-                  color: '#842029',
-                  padding: '12px 14px', borderRadius: 10,
-                  fontSize: 13, marginBottom: 18,
-                  display: 'flex', gap: 10, alignItems: 'flex-start'
-                }}>
-                  <span style={{ fontSize: 18 }}>⚡</span>
-                  <div>
-                    <strong style={{ display: 'block', marginBottom: 4 }}>US-10 · Riesgo Eléctrico Crítico</strong>
-                    <span>{errores.__us10}</span>
-                  </div>
-                </div>
-              )}
-
               {/* SECCIÓN 1: TIPO DE OT como CHIPS */}
               <SeccionTitulo icono="🎯" titulo="Tipo de intervención" />
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 6 }}>
@@ -817,68 +779,20 @@ function OrdenesTrabajo() {
                 </div>
               </div>
 
-              {/* SECCIÓN 4: ESTADO como CHIPS */}
-              <div style={{ marginTop: 22 }}>
-                <SeccionTitulo icono="🚦" titulo="Estado de la OT" />
-                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 10 }}>
-                  {ESTADOS_SELECCIONABLES.map(e => {
-                    const seleccionado = estado === e.nombre;
-                    const c = e.color;
-                    return (
-                      <button
-                        key={e.nombre} type="button"
-                        onClick={() => cambiarCampo('estado', e.nombre, setEstado)}
-                        style={{
-                          padding: '10px 16px', borderRadius: 10,
-                          border: seleccionado ? `2px solid ${c.fg}` : '2px solid #E5EDF3',
-                          background: seleccionado ? c.bg : 'white',
-                          color: seleccionado ? c.fg : '#6B7C8C',
-                          fontSize: 13, fontWeight: seleccionado ? 600 : 500,
-                          cursor: 'pointer', transition: 'all 0.15s',
-                          display: 'flex', alignItems: 'center', gap: 8,
-                          boxShadow: seleccionado ? `0 2px 8px ${c.bg}` : 'none'
-                        }}
-                      >
-                        <span style={{
-                          width: 10, height: 10, borderRadius: '50%',
-                          background: c.fg, opacity: seleccionado ? 1 : 0.4
-                        }}></span>
-                        {e.nombre}
-                      </button>
-                    );
-                  })}
+              {/* SECCIÓN 4: ESTADO (solo lectura: lo mueven las tareas de mantenimiento) */}
+              {editando && (
+                <div style={{ marginTop: 22 }}>
+                  <SeccionTitulo icono="🚦" titulo="Estado de la OT" />
+                  <span style={{
+                    display: 'inline-block', padding: '6px 14px', borderRadius: 999,
+                    background: chipEstadoOT(estado).bg, color: chipEstadoOT(estado).fg,
+                    fontSize: 13, fontWeight: 600
+                  }}>{estado}</span>
+                  <small style={{ color: '#9E9CBB', fontSize: 11, marginTop: 8, display: 'block' }}>
+                    El estado cambia automáticamente: Pendiente al crear; En curso al registrar una tarea; Cerrada al cargar la fecha de fin.
+                  </small>
                 </div>
-                <div style={{ fontSize: 11, color: '#0C447C', background: '#E6F1FB', borderRadius: 8, padding: '8px 12px', marginBottom: 10 }}>
-                  ℹ El estado del activo se actualiza solo: <strong>Pendiente</strong> → Fuera de servicio · <strong>En curso</strong> → En mantenimiento · <strong>Cerrada</strong> → vuelve a En servicio (si no tiene otras OT abiertas).
-                </div>
-
-                {(estado === 'Cerrada' || estado === 'Anulada') && (
-                  <div>
-                    <label style={lblStyle}>Fecha de cierre (opcional)</label>
-                    <DatePicker
-                      selected={fechaCierre ? new Date(fechaCierre + 'T00:00:00') : null}
-                      onChange={(date) => {
-                        if (date) {
-                          const yyyy = date.getFullYear();
-                          const mm = String(date.getMonth() + 1).padStart(2, '0');
-                          const dd = String(date.getDate()).padStart(2, '0');
-                          cambiarCampo('fechaCierre', `${yyyy}-${mm}-${dd}`, setFechaCierre);
-                        } else {
-                          cambiarCampo('fechaCierre', '', setFechaCierre);
-                        }
-                      }}
-                      dateFormat="dd/MM/yyyy"
-                      maxDate={new Date()}
-                      isClearable
-                      customInput={<CustomDateInput />}
-               
-                    />
-                    <small style={{ color: '#9E9CBB', fontSize: 11, marginTop: 4, display: 'block' }}>
-                      Si dejás vacío al cerrar, se completa automáticamente con la fecha actual.
-                    </small>
-                  </div>
-                )}
-              </div>
+              )}
 
               {/* SECCIÓN 5: SÍNTOMA / DESCRIPCIÓN */}
               <div style={{ marginTop: 22 }}>
@@ -905,16 +819,7 @@ function OrdenesTrabajo() {
               display:'flex', justifyContent:'flex-end', gap:10
             }}>
               <button onClick={cerrarModal} style={btnGhost}>Cancelar</button>
-              <button
-                onClick={guardar}
-                disabled={!puedeCerrarseAhora}
-                style={{
-                  ...btnSave,
-                  opacity: puedeCerrarseAhora ? 1 : 0.5,
-                  cursor: puedeCerrarseAhora ? 'pointer' : 'not-allowed'
-                }}
-                title={!puedeCerrarseAhora ? 'No se puede cerrar sin seguridad eléctrica aprobada (US-10)' : ''}
-              >{editando ? '✓ Actualizar OT' : '✓ Registrar OT'}</button>
+              <button onClick={guardar} style={btnSave}>{editando ? '✓ Actualizar OT' : '✓ Registrar OT'}</button>
             </div>
           </div>
         </div>

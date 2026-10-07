@@ -426,6 +426,10 @@ namespace NODUS.Data.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("fecha");
 
+                    b.Property<DateTime?>("FechaFin")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("fecha_fin");
+
                     b.Property<int>("IdOT")
                         .HasColumnType("integer")
                         .HasColumnName("id_ot");

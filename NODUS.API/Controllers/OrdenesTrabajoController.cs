@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using NODUS.API.Services;
 using NODUS.Data;
 using NODUS.Models;
 
@@ -10,24 +11,21 @@ namespace NODUS.API.Controllers
     public class OrdenesTrabajoController : ControllerBase
     {
         private readonly NodusDbContext _db;
+        private readonly EstadosOTService _estados;
 
-        // IDs de estados del equipo (matchean con el seed del DbContext)
-        private const int ID_ESTADO_EN_SERVICIO = 1;
-        private const int ID_ESTADO_EN_MANTENIMIENTO = 2;
-        private const int ID_ESTADO_FUERA_DE_SERVICIO = 3;
-        private const int ID_ESTADO_EN_PRESTAMO = 4;
-        private const int ID_ESTADO_BAJA_PATRIMONIAL = 5;
+        private const int ID_ESTADO_EN_PRESTAMO = EstadosOTService.ID_ESTADO_EN_PRESTAMO;
+        private const int ID_ESTADO_BAJA_PATRIMONIAL = EstadosOTService.ID_ESTADO_BAJA_PATRIMONIAL;
 
         private const string MSJ_EQUIPO_EN_PRESTAMO =
             "El equipo está en préstamo. Registrá la devolución antes de crear una orden de trabajo.";
 
-        // Estados válidos de la OT
-        private static readonly string[] ESTADOS_VALIDOS = { "Pendiente", "En curso", "Cerrada", "Anulada" };
+        // El estado de la OT no se edita: lo derivan sus tareas de mantenimiento (EstadosOTService)
         private static readonly string[] TIPOS_VALIDOS = { "Correctiva", "Preventiva", "Calibración", "Verificación de seguridad eléctrica" };
 
-        public OrdenesTrabajoController(NodusDbContext db)
+        public OrdenesTrabajoController(NodusDbContext db, EstadosOTService estados)
         {
             _db = db;
+            _estados = estados;
         }
 
         // GET: api/ordenestrabajo
@@ -83,12 +81,11 @@ namespace NODUS.API.Controllers
                 return BadRequest($"Tipo de OT inválido. Valores permitidos: {string.Join(", ", TIPOS_VALIDOS)}.");
             if (string.IsNullOrWhiteSpace(ot.Sintoma))
                 return BadRequest("El síntoma o descripción del trabajo es obligatorio.");
-            if (!ESTADOS_VALIDOS.Contains(ot.Estado))
-                ot.Estado = "Pendiente";
 
+            // Toda OT nace "Pendiente"; después la mueven sus tareas
+            ot.Estado = "Pendiente";
+            ot.FechaCierre = null;
             ot.FechaApertura = DateTime.SpecifyKind(ot.FechaApertura, DateTimeKind.Utc);
-            if (ot.FechaCierre.HasValue)
-                ot.FechaCierre = DateTime.SpecifyKind(ot.FechaCierre.Value, DateTimeKind.Utc);
 
             // Validar que el equipo exista
             var equipo = await _db.Equipos.FindAsync(ot.IdEquipo);
@@ -103,14 +100,14 @@ namespace NODUS.API.Controllers
                 return BadRequest("Error: Equipo inactivo por baja técnica definitiva.");
             }
 
-            if (EsAbierta(ot.Estado) && equipo.IdEstado == ID_ESTADO_EN_PRESTAMO)
+            if (equipo.IdEstado == ID_ESTADO_EN_PRESTAMO)
                 return BadRequest(MSJ_EQUIPO_EN_PRESTAMO);
 
             // La OT y el estado del equipo se guardan juntos
             await using var tx = await _db.Database.BeginTransactionAsync();
             _db.OrdenesTrabajo.Add(ot);
             await _db.SaveChangesAsync();
-            await RecalcularEstadoEquipo(ot.IdEquipo);
+            await _estados.RecalcularEstadoEquipo(ot.IdEquipo);
             await _db.SaveChangesAsync();
             await tx.CommitAsync();
 
@@ -124,8 +121,6 @@ namespace NODUS.API.Controllers
             if (id != ot.IdOT) return BadRequest();
             if (!TIPOS_VALIDOS.Contains(ot.Tipo))
                 return BadRequest($"Tipo de OT inválido.");
-            if (!ESTADOS_VALIDOS.Contains(ot.Estado))
-                return BadRequest("Estado de OT inválido.");
 
             var otAnterior = await _db.OrdenesTrabajo.AsNoTracking().FirstOrDefaultAsync(o => o.IdOT == id);
             if (otAnterior == null) return NotFound();
@@ -155,41 +150,19 @@ namespace NODUS.API.Controllers
                 }
             }
 
-            // No se abre, reabre ni mueve una OT abierta a un equipo en préstamo
-            if (EsAbierta(ot.Estado) && (cambioEquipo || !EsAbierta(otAnterior.Estado)))
+            // No se mueve una OT abierta a un equipo en préstamo
+            if (cambioEquipo)
             {
                 var equipoDestino = await _db.Equipos.FindAsync(ot.IdEquipo);
                 if (equipoDestino?.IdEstado == ID_ESTADO_EN_PRESTAMO)
                     return BadRequest(MSJ_EQUIPO_EN_PRESTAMO);
             }
 
-            // ═══════════════════════════════════════════════════════════════════
-            // US-10: RIESGO ELÉCTRICO CRÍTICO (Política de Bioingeniería)
-            // ═══════════════════════════════════════════════════════════════════
-            bool seEstaCerrando = (otAnterior.Estado == "Pendiente" || otAnterior.Estado == "En curso")
-                              && ot.Estado == "Cerrada";
-
-            if (seEstaCerrando)
-            {
-                bool tieneSegElectricaAprobada = await _db.Intervenciones
-                    .AnyAsync(i => i.IdOT == id && i.ResultadoSegElectrica == "Aprobado");
-
-                if (!tieneSegElectricaAprobada)
-                {
-                    return BadRequest("Acción Denegada: Es obligatorio registrar el resultado de seguridad eléctrica.");
-                }
-            }
-
+            // El estado y la fecha de cierre no se editan acá: los derivan las tareas
+            // (EstadosOTService.RecalcularEstadoOT, que también aplica la regla US-10)
+            ot.Estado = otAnterior.Estado;
+            ot.FechaCierre = otAnterior.FechaCierre;
             ot.FechaApertura = DateTime.SpecifyKind(ot.FechaApertura, DateTimeKind.Utc);
-
-            if (ot.Estado == "Cerrada" && !ot.FechaCierre.HasValue)
-            {
-                ot.FechaCierre = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Utc);
-            }
-            else if (ot.FechaCierre.HasValue)
-            {
-                ot.FechaCierre = DateTime.SpecifyKind(ot.FechaCierre.Value, DateTimeKind.Utc);
-            }
 
             _db.Entry(ot).State = EntityState.Modified;
 
@@ -202,9 +175,9 @@ namespace NODUS.API.Controllers
                 throw;
             }
 
-            await RecalcularEstadoEquipo(ot.IdEquipo);
+            await _estados.RecalcularEstadoEquipo(ot.IdEquipo);
             if (cambioEquipo)
-                await RecalcularEstadoEquipo(otAnterior.IdEquipo);
+                await _estados.RecalcularEstadoEquipo(otAnterior.IdEquipo);
             await _db.SaveChangesAsync();
             await tx.CommitAsync();
 
@@ -232,34 +205,10 @@ namespace NODUS.API.Controllers
             await using var tx = await _db.Database.BeginTransactionAsync();
             _db.OrdenesTrabajo.Remove(ot);
             await _db.SaveChangesAsync();
-            await RecalcularEstadoEquipo(ot.IdEquipo);
+            await _estados.RecalcularEstadoEquipo(ot.IdEquipo);
             await _db.SaveChangesAsync();
             await tx.CommitAsync();
             return NoContent();
-        }
-
-        private static bool EsAbierta(string estado) => estado == "Pendiente" || estado == "En curso";
-
-        // REGLA DE NEGOCIO: el estado del equipo se deriva de sus OT abiertas.
-        // Alguna "En curso" -> En mantenimiento; si no, alguna "Pendiente" -> Fuera de servicio;
-        // ninguna abierta -> En servicio. Cerradas y anuladas no cuentan.
-        // No toca equipos dados de baja ni en préstamo (esos estados los gestionan sus módulos).
-        private async Task RecalcularEstadoEquipo(int idEquipo)
-        {
-            var equipo = await _db.Equipos.FindAsync(idEquipo);
-            if (equipo == null
-                || equipo.IdEstado == ID_ESTADO_BAJA_PATRIMONIAL
-                || equipo.IdEstado == ID_ESTADO_EN_PRESTAMO)
-                return;
-
-            var estadosAbiertas = await _db.OrdenesTrabajo
-                .Where(o => o.IdEquipo == idEquipo && (o.Estado == "Pendiente" || o.Estado == "En curso"))
-                .Select(o => o.Estado)
-                .ToListAsync();
-
-            equipo.IdEstado = estadosAbiertas.Contains("En curso") ? ID_ESTADO_EN_MANTENIMIENTO
-                            : estadosAbiertas.Contains("Pendiente") ? ID_ESTADO_FUERA_DE_SERVICIO
-                            : ID_ESTADO_EN_SERVICIO;
         }
     }
 }

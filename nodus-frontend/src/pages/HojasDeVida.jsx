@@ -646,7 +646,9 @@ function HistoriaDetalle({ historia, colorMarca, colorTipo }) {
                             {i.tareasRealizadas}
                           </div>
                           <div style={{ fontSize: 10, color: '#9E9CBB' }}>
-                            📅 {fmtFecha(i.fecha)} · 👤 {i.usuario?.nombre || '—'}
+                            📅 Fecha de inicio: {fmtFecha(i.fecha)}
+                            {i.fechaFin && <> · Fecha de fin: {fmtFecha(i.fechaFin)}</>}
+                            {' '}· 👤 {i.usuario?.nombre || '—'}
                           </div>
                         </div>
                       );
