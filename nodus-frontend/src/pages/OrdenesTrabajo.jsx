@@ -65,10 +65,11 @@ const ESTADOS = [
 // "Anulada" se sigue listando para las OT ya guardadas, pero no se ofrece en el formulario
 const ESTADOS_SELECCIONABLES = ESTADOS.filter(e => e.nombre !== 'Anulada');
 
+const ID_ESTADO_BAJA_PATRIMONIAL = 5;
+
 function OrdenesTrabajo() {
   const [ots, setOts] = useState([]);
   const [equipos, setEquipos] = useState([]);
-  const [estadosEquipo, setEstadosEquipo] = useState([]);
   const [servicios, setServicios] = useState([]);
   const [usuarios, setUsuarios] = useState([]);
   const [intervenciones, setIntervenciones] = useState([]);
@@ -105,7 +106,7 @@ function OrdenesTrabajo() {
   const [busquedaAbierta, setBusquedaAbierta] = useState(false);
 
   useEffect(() => {
-    cargarOTs(); cargarEquipos(); cargarEstadosEquipo();
+    cargarOTs(); cargarEquipos();
     cargarServicios(); cargarUsuarios(); cargarIntervenciones();
   }, []);
 
@@ -117,7 +118,6 @@ function OrdenesTrabajo() {
 
   const cargarOTs            = async () => { const r = await api.get('/ordenestrabajo');   setOts(r.data); };
   const cargarEquipos        = async () => { const r = await api.get('/equipos');          setEquipos(r.data); };
-  const cargarEstadosEquipo  = async () => { const r = await api.get('/estadosequipo');    setEstadosEquipo(r.data); };
   const cargarServicios      = async () => { const r = await api.get('/servicios');        setServicios(r.data); };
   const cargarUsuarios       = async () => { const r = await api.get('/usuarios');         setUsuarios(r.data); };
   const cargarIntervenciones = async () => { const r = await api.get('/intervenciones');   setIntervenciones(r.data); };
@@ -132,17 +132,14 @@ function OrdenesTrabajo() {
     );
   };
 
-  // ─── US-05: chequea si un equipo está inhabilitado ───
-  const equipoInhabilitado = (equipo) => {
-    if (!equipo) return false;
-    const estado = estadosEquipo.find(e => e.idEstado === equipo.idEstado);
-    return estado?.inhabilitaOperacion === true;
-  };
+  // ─── US-05: solo los equipos dados de baja no admiten OT ───
+  // (Fuera de servicio / En mantenimiento sí: un equipo puede tener varias OT abiertas)
+  const equipoInhabilitado = (equipo) => equipo?.idEstado === ID_ESTADO_BAJA_PATRIMONIAL;
 
   // ─── US-05: equipos disponibles ───
   const equiposDisponibles = useMemo(() => {
     return equipos.filter(eq => !equipoInhabilitado(eq));
-  }, [equipos, estadosEquipo]);
+  }, [equipos]);
 
   // Buscador autocomplete (usa equipos disponibles - US-05)
   const equiposFiltradosBuscador = useMemo(() => {
@@ -850,6 +847,9 @@ function OrdenesTrabajo() {
                       </button>
                     );
                   })}
+                </div>
+                <div style={{ fontSize: 11, color: '#0C447C', background: '#E6F1FB', borderRadius: 8, padding: '8px 12px', marginBottom: 10 }}>
+                  ℹ El estado del activo se actualiza solo: <strong>Pendiente</strong> → Fuera de servicio · <strong>En curso</strong> → En mantenimiento · <strong>Cerrada</strong> → vuelve a En servicio (si no tiene otras OT abiertas).
                 </div>
 
                 {(estado === 'Cerrada' || estado === 'Anulada') && (

@@ -12,8 +12,14 @@ namespace NODUS.API.Controllers
         private readonly NodusDbContext _db;
 
         // IDs de estados del equipo (matchean con el seed del DbContext)
-        private const int ESTADO_EN_SERVICIO = 1;
-        private const int ESTADO_EN_MANTENIMIENTO = 2;
+        private const int ID_ESTADO_EN_SERVICIO = 1;
+        private const int ID_ESTADO_EN_MANTENIMIENTO = 2;
+        private const int ID_ESTADO_FUERA_DE_SERVICIO = 3;
+        private const int ID_ESTADO_EN_PRESTAMO = 4;
+        private const int ID_ESTADO_BAJA_PATRIMONIAL = 5;
+
+        private const string MSJ_EQUIPO_EN_PRESTAMO =
+            "El equipo está en préstamo. Registrá la devolución antes de crear una orden de trabajo.";
 
         // Estados válidos de la OT
         private static readonly string[] ESTADOS_VALIDOS = { "Pendiente", "En curso", "Cerrada", "Anulada" };
@@ -84,29 +90,29 @@ namespace NODUS.API.Controllers
             if (ot.FechaCierre.HasValue)
                 ot.FechaCierre = DateTime.SpecifyKind(ot.FechaCierre.Value, DateTimeKind.Utc);
 
-            // Validar que el equipo exista (cargando su estado para US-05)
-            var equipo = await _db.Equipos
-                .Include(e => e.EstadoEquipo)
-                .FirstOrDefaultAsync(e => e.IdEquipo == ot.IdEquipo);
+            // Validar que el equipo exista
+            var equipo = await _db.Equipos.FindAsync(ot.IdEquipo);
 
             if (equipo == null) return BadRequest("El equipo seleccionado no existe.");
 
             // ═══════════════════════════════════════════════════════════════════
             // US-05: OPERACIÓN DE ACTIVOS DADOS DE BAJA (Criterio de Baja)
             // ═══════════════════════════════════════════════════════════════════
-            if (equipo.EstadoEquipo?.InhabilitaOperacion == true)
+            if (equipo.IdEstado == ID_ESTADO_BAJA_PATRIMONIAL)
             {
                 return BadRequest("Error: Equipo inactivo por baja técnica definitiva.");
             }
 
-            // REGLA DE NEGOCIO: al crear una OT abierta, el equipo pasa a "En mantenimiento"
-            if (ot.Estado == "Pendiente" || ot.Estado == "En curso")
-            {
-                equipo.IdEstado = ESTADO_EN_MANTENIMIENTO;
-            }
+            if (EsAbierta(ot.Estado) && equipo.IdEstado == ID_ESTADO_EN_PRESTAMO)
+                return BadRequest(MSJ_EQUIPO_EN_PRESTAMO);
 
+            // La OT y el estado del equipo se guardan juntos
+            await using var tx = await _db.Database.BeginTransactionAsync();
             _db.OrdenesTrabajo.Add(ot);
             await _db.SaveChangesAsync();
+            await RecalcularEstadoEquipo(ot.IdEquipo);
+            await _db.SaveChangesAsync();
+            await tx.CommitAsync();
 
             return CreatedAtAction(nameof(GetOT), new { id = ot.IdOT }, ot);
         }
@@ -135,19 +141,26 @@ namespace NODUS.API.Controllers
             // ═══════════════════════════════════════════════════════════════════
             // US-05: OPERACIÓN DE ACTIVOS DADOS DE BAJA
             // ═══════════════════════════════════════════════════════════════════
-            if (ot.IdEquipo != otAnterior.IdEquipo)
+            bool cambioEquipo = ot.IdEquipo != otAnterior.IdEquipo;
+            if (cambioEquipo)
             {
-                var equipoNuevo = await _db.Equipos
-                    .Include(e => e.EstadoEquipo)
-                    .FirstOrDefaultAsync(e => e.IdEquipo == ot.IdEquipo);
+                var equipoNuevo = await _db.Equipos.FindAsync(ot.IdEquipo);
 
                 if (equipoNuevo == null)
                     return BadRequest("El equipo seleccionado no existe.");
 
-                if (equipoNuevo.EstadoEquipo?.InhabilitaOperacion == true)
+                if (equipoNuevo.IdEstado == ID_ESTADO_BAJA_PATRIMONIAL)
                 {
                     return BadRequest("Error: Equipo inactivo por baja técnica definitiva.");
                 }
+            }
+
+            // No se abre, reabre ni mueve una OT abierta a un equipo en préstamo
+            if (EsAbierta(ot.Estado) && (cambioEquipo || !EsAbierta(otAnterior.Estado)))
+            {
+                var equipoDestino = await _db.Equipos.FindAsync(ot.IdEquipo);
+                if (equipoDestino?.IdEstado == ID_ESTADO_EN_PRESTAMO)
+                    return BadRequest(MSJ_EQUIPO_EN_PRESTAMO);
             }
 
             // ═══════════════════════════════════════════════════════════════════
@@ -178,14 +191,10 @@ namespace NODUS.API.Controllers
                 ot.FechaCierre = DateTime.SpecifyKind(ot.FechaCierre.Value, DateTimeKind.Utc);
             }
 
-            bool seCerro = (otAnterior.Estado == "Pendiente" || otAnterior.Estado == "En curso")
-                        && (ot.Estado == "Cerrada" || ot.Estado == "Anulada");
-
-            bool seReabrio = (otAnterior.Estado == "Cerrada" || otAnterior.Estado == "Anulada")
-                          && (ot.Estado == "Pendiente" || ot.Estado == "En curso");
-
             _db.Entry(ot).State = EntityState.Modified;
 
+            // La OT y el estado del equipo (o de ambos equipos, si cambió) se guardan juntos
+            await using var tx = await _db.Database.BeginTransactionAsync();
             try { await _db.SaveChangesAsync(); }
             catch (DbUpdateConcurrencyException)
             {
@@ -193,28 +202,11 @@ namespace NODUS.API.Controllers
                 throw;
             }
 
-            var equipo = await _db.Equipos.FindAsync(ot.IdEquipo);
-            if (equipo != null)
-            {
-                if (seCerro)
-                {
-                    bool tieneOtrasAbiertas = await _db.OrdenesTrabajo
-                        .AnyAsync(o => o.IdEquipo == ot.IdEquipo
-                                    && o.IdOT != ot.IdOT
-                                    && (o.Estado == "Pendiente" || o.Estado == "En curso"));
-
-                    if (!tieneOtrasAbiertas)
-                    {
-                        equipo.IdEstado = ESTADO_EN_SERVICIO;
-                        await _db.SaveChangesAsync();
-                    }
-                }
-                else if (seReabrio)
-                {
-                    equipo.IdEstado = ESTADO_EN_MANTENIMIENTO;
-                    await _db.SaveChangesAsync();
-                }
-            }
+            await RecalcularEstadoEquipo(ot.IdEquipo);
+            if (cambioEquipo)
+                await RecalcularEstadoEquipo(otAnterior.IdEquipo);
+            await _db.SaveChangesAsync();
+            await tx.CommitAsync();
 
             return NoContent();
         }
@@ -237,9 +229,37 @@ namespace NODUS.API.Controllers
             if (tieneIntervenciones || tieneUsoInsumo)
                 return BadRequest("No se puede eliminar: la OT tiene intervenciones o uso de insumos asociados. Considere anularla en lugar de eliminarla.");
 
+            await using var tx = await _db.Database.BeginTransactionAsync();
             _db.OrdenesTrabajo.Remove(ot);
             await _db.SaveChangesAsync();
+            await RecalcularEstadoEquipo(ot.IdEquipo);
+            await _db.SaveChangesAsync();
+            await tx.CommitAsync();
             return NoContent();
+        }
+
+        private static bool EsAbierta(string estado) => estado == "Pendiente" || estado == "En curso";
+
+        // REGLA DE NEGOCIO: el estado del equipo se deriva de sus OT abiertas.
+        // Alguna "En curso" -> En mantenimiento; si no, alguna "Pendiente" -> Fuera de servicio;
+        // ninguna abierta -> En servicio. Cerradas y anuladas no cuentan.
+        // No toca equipos dados de baja ni en préstamo (esos estados los gestionan sus módulos).
+        private async Task RecalcularEstadoEquipo(int idEquipo)
+        {
+            var equipo = await _db.Equipos.FindAsync(idEquipo);
+            if (equipo == null
+                || equipo.IdEstado == ID_ESTADO_BAJA_PATRIMONIAL
+                || equipo.IdEstado == ID_ESTADO_EN_PRESTAMO)
+                return;
+
+            var estadosAbiertas = await _db.OrdenesTrabajo
+                .Where(o => o.IdEquipo == idEquipo && (o.Estado == "Pendiente" || o.Estado == "En curso"))
+                .Select(o => o.Estado)
+                .ToListAsync();
+
+            equipo.IdEstado = estadosAbiertas.Contains("En curso") ? ID_ESTADO_EN_MANTENIMIENTO
+                            : estadosAbiertas.Contains("Pendiente") ? ID_ESTADO_FUERA_DE_SERVICIO
+                            : ID_ESTADO_EN_SERVICIO;
         }
     }
 }
