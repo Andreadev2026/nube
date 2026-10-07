@@ -242,7 +242,7 @@ namespace NODUS.Data.Migrations
                         {
                             IdEstado = 2,
                             ColorSemaforo = "amarillo",
-                            Descripcion = "Fuera de servicio transitorio por OT abierta",
+                            Descripcion = "Equipo con orden de trabajo en curso",
                             InhabilitaOperacion = true,
                             Nombre = "En mantenimiento"
                         },
@@ -250,7 +250,7 @@ namespace NODUS.Data.Migrations
                         {
                             IdEstado = 3,
                             ColorSemaforo = "rojo",
-                            Descripcion = "Falla sin OT asignada",
+                            Descripcion = "Equipo con orden de trabajo pendiente, aún no iniciada",
                             InhabilitaOperacion = true,
                             Nombre = "Fuera de servicio"
                         },

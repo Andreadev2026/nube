@@ -322,8 +322,8 @@ namespace NODUS.Data
             // ── SEED DATA ──
             modelBuilder.Entity<EstadoEquipo>().HasData(
                 new EstadoEquipo { IdEstado = 1, Nombre = "En servicio", ColorSemaforo = "verde", InhabilitaOperacion = false, Descripcion = "Equipo operativo y disponible" },
-                new EstadoEquipo { IdEstado = 2, Nombre = "En mantenimiento", ColorSemaforo = "amarillo", InhabilitaOperacion = true, Descripcion = "Fuera de servicio transitorio por OT abierta" },
-                new EstadoEquipo { IdEstado = 3, Nombre = "Fuera de servicio", ColorSemaforo = "rojo", InhabilitaOperacion = true, Descripcion = "Falla sin OT asignada" },
+                new EstadoEquipo { IdEstado = 2, Nombre = "En mantenimiento", ColorSemaforo = "amarillo", InhabilitaOperacion = true, Descripcion = "Equipo con orden de trabajo en curso" },
+                new EstadoEquipo { IdEstado = 3, Nombre = "Fuera de servicio", ColorSemaforo = "rojo", InhabilitaOperacion = true, Descripcion = "Equipo con orden de trabajo pendiente, aún no iniciada" },
                 new EstadoEquipo { IdEstado = 4, Nombre = "En préstamo", ColorSemaforo = "azul", InhabilitaOperacion = false, Descripcion = "Cedido temporalmente" },
                 new EstadoEquipo { IdEstado = 5, Nombre = "Baja patrimonial", ColorSemaforo = "gris", InhabilitaOperacion = true, Descripcion = "Dado de baja definitivamente" }
             );
