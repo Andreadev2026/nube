@@ -479,7 +479,7 @@ function OrdenesTrabajo() {
                   <div style={{ fontSize: 14, fontWeight: 600, color: '#1a1a1a', lineHeight: 1.3 }}>
                     {o.tipo}
                     <span style={{ fontSize: 11, color: '#9E9CBB', fontWeight: 500, marginLeft: 6 }}>
-                      OT #{o.idOT}
+                      OT {o.idOT}
                     </span>
                   </div>
                   {editable ? (

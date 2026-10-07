@@ -297,7 +297,7 @@ function UsosInsumo() {
               <option value="">Todas las OTs</option>
               {ots.map(o => (
                 <option key={o.idOT} value={o.idOT}>
-                  OT #{o.idOT} · {o.equipo?.modelo || 'equipo'}
+                  OT {o.idOT} · {o.equipo?.modelo || 'equipo'}
                 </option>
               ))}
             </select>
@@ -353,7 +353,7 @@ function UsosInsumo() {
             {usosFiltrados.map(u => (
               <tr key={u.idUso} style={{ borderBottom: '1px solid #F1F4F7' }}>
                 <td style={{ ...tdStyle, fontWeight: 600, color: '#1a1a1a' }}>
-                  OT #{u.idOT}
+                  OT {u.idOT}
                 </td>
                 <td style={{ ...tdStyle, color: '#2D3748' }}>
                   {u.ordenTrabajo?.equipo?.modelo || '—'}
@@ -499,7 +499,7 @@ function UsosInsumo() {
                     <span style={{ fontSize: 14 }}>✓</span>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 13, fontWeight: 600, color: '#1a1a1a' }}>
-                        OT #{otSeleccionada.idOT} · {otSeleccionada.tipo}
+                        OT {otSeleccionada.idOT} · {otSeleccionada.tipo}
                       </div>
                       <div style={{ fontSize: 11, color: '#6B7C8C', marginTop: 2 }}>
                         {otSeleccionada.equipo?.modelo || '—'} · Estado: {otSeleccionada.estado}
@@ -569,7 +569,7 @@ function UsosInsumo() {
                               onMouseOut={(e) => e.currentTarget.style.background = 'white'}
                             >
                               <div style={{ fontSize: 13, fontWeight: 600, color: '#1a1a1a' }}>
-                                OT #{o.idOT} · {o.tipo}
+                                OT {o.idOT} · {o.tipo}
                               </div>
                               <div style={{ fontSize: 11, color: '#6B7C8C', marginTop: 2 }}>
                                 {o.equipo?.modelo || '—'}

@@ -383,7 +383,7 @@ function Reportes() {
     const map = {};
     intervencionesFiltradas.forEach(iv => {
       const ot = ots.find(o => o.idOT === iv.idOT);
-      const nombre = ot?.equipo?.modelo || `OT #${iv.idOT}`;
+      const nombre = ot?.equipo?.modelo || `OT ${iv.idOT}`;
       map[nombre] = (map[nombre] || 0) + 1;
     });
     return Object.entries(map)
@@ -550,7 +550,7 @@ function Reportes() {
       'Fecha apertura': o.fechaApertura?.split('T')[0] || '', 'Fecha cierre': o.fechaCierre?.split('T')[0] || ''
     }))), 'OTs');
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(usosFiltrados.map(u => ({
-      Insumo: u.insumo?.nombre || '', Cantidad: u.cantidad, OT: `OT #${u.idOT}`
+      Insumo: u.insumo?.nombre || '', Cantidad: u.cantidad, OT: `OT ${u.idOT}`
     }))), 'Insumos');
     XLSX.writeFile(wb, `NODUS_Dashboard_${new Date().toISOString().split('T')[0]}.xlsx`);
     setMostrarExportar(false);
@@ -640,7 +640,7 @@ function Reportes() {
     },
     ots: {
       titulo: 'Listado de Órdenes de Trabajo',
-      columnas: ['OT #', 'Tipo', 'Estado', 'Equipo', 'Apertura', 'Cierre'],
+      columnas: ['OT', 'Tipo', 'Estado', 'Equipo', 'Apertura', 'Cierre'],
       filas: otsListado.map(r => [r.id, r.tipo, r.estado, r.equipo, r.apertura, r.cierre])
     },
     insumos: {

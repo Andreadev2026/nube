@@ -52,7 +52,11 @@ const CustomDateInput = forwardRef(({ value, onClick, placeholder }, ref) => (
 
 const RESULTADOS = [
   { nombre: 'Aprobado', icono: '✅', color: { bg: '#E1F5EE', fg: '#0F6E56' } },
-  { nombre: 'Aprobado con observaciones', icono: '⚠️', color: { bg: '#FAEEDA', fg: '#633806' } },
+  { nombre: 'Aprobado con observaciones', icono: '⚠️', color: { bg: '#FAEEDA', fg: '#633806' } }
+];
+
+// Ya no se ofrecen en el formulario, pero hay registros guardados con estos valores
+const RESULTADOS_HISTORICOS = [
   { nombre: 'Reprobado', icono: '❌', color: { bg: '#FAECE7', fg: '#712B13' } },
   { nombre: 'No aplica', icono: '➖', color: { bg: '#F1EFE8', fg: '#444441' } }
 ];
@@ -279,7 +283,7 @@ function Intervenciones() {
   };
 
   const chipResultado = (r) => {
-    const found = RESULTADOS.find(x => x.nombre === r);
+    const found = [...RESULTADOS, ...RESULTADOS_HISTORICOS].find(x => x.nombre === r);
     return found?.color || { bg: '#F1EFE8', fg: '#444441' };
   };
 
@@ -503,7 +507,7 @@ function Intervenciones() {
               <div style={{ background: '#FAFBFC', borderRadius: 10, padding: '16px 20px', marginBottom: 20 }}>
                 <FilaDetalle label="Técnico">{seleccionada.usuario?.nombre || '—'}</FilaDetalle>
                 <FilaDetalle label="OT asociada">
-                  <span>OT #{seleccionada.idOT} · {seleccionada.ordenTrabajo?.tipo || '—'}</span>
+                  <span>OT {seleccionada.idOT} · {seleccionada.ordenTrabajo?.tipo || '—'}</span>
                 </FilaDetalle>
                 <FilaDetalle label="Resultado seg. eléctrica">
                   <span style={{
@@ -622,7 +626,7 @@ function Intervenciones() {
                     <span style={{ fontSize: 14 }}>✓</span>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 13, fontWeight: 600, color: '#1a1a1a' }}>
-                        OT #{otSeleccionada.idOT} · {otSeleccionada.tipo}
+                        OT {otSeleccionada.idOT} · {otSeleccionada.tipo}
                       </div>
                       <div style={{ fontSize: 11, color: '#6B7C8C', marginTop: 2 }}>
                         {otSeleccionada.equipo?.modelo || '—'}
@@ -692,7 +696,7 @@ function Intervenciones() {
                               onMouseOut={(e) => e.currentTarget.style.background = 'white'}
                             >
                               <div style={{ fontSize: 13, fontWeight: 600, color: '#1a1a1a' }}>
-                                OT #{o.idOT} · {o.tipo}
+                                OT {o.idOT} · {o.tipo}
                               </div>
                               <div style={{ fontSize: 11, color: '#6B7C8C', marginTop: 2 }}>
                                 {o.equipo?.modelo || '—'}

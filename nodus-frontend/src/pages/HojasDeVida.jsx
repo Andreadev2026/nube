@@ -605,7 +605,7 @@ function HistoriaDetalle({ historia, colorMarca, colorTipo }) {
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, gap: 8 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: '#1a1a1a' }}>
-                    OT #{o.idOT} · {o.tipo}
+                    OT {o.idOT} · {o.tipo}
                   </div>
                   <span style={{
                     display: 'inline-block', padding: '2px 10px', borderRadius: 999,
