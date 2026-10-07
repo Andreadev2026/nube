@@ -16,12 +16,20 @@ namespace NODUS.API.Controllers
         private static readonly string[] RESULTADOS_VALIDOS = {
             "Aprobado",
             "Aprobado con observaciones",
+            "Desaprobado",
+            // Valores viejos: ya no se ofrecen, pero quedan tareas guardadas con ellos
             "Reprobado",
             "No aplica"
         };
 
-        private const string MSJ_OT_FINALIZADA =
-            "No se pueden registrar ni modificar tareas en una OT cerrada o anulada.";
+        private const string MSJ_OT_CERRADA =
+            "No se pueden registrar tareas nuevas en una OT cerrada. Si hay que reabrirla, editá su última tarea con resultado Desaprobado.";
+        private const string MSJ_OT_ANULADA =
+            "No se pueden registrar ni modificar tareas en una OT anulada.";
+        private const string MSJ_ELIMINAR_OT_FINALIZADA =
+            "No se pueden eliminar tareas de una OT cerrada o anulada.";
+        private const string MSJ_MOVER_OT_FINALIZADA =
+            "No se puede mover una tarea desde o hacia una OT cerrada o anulada.";
 
         public IntervencionesController(NodusDbContext db, EstadosOTService estados)
         {
@@ -80,7 +88,8 @@ namespace NODUS.API.Controllers
             // La OT tiene que existir y seguir abierta
             var ot = await _db.OrdenesTrabajo.AsNoTracking().FirstOrDefaultAsync(o => o.IdOT == i.IdOT);
             if (ot == null) return BadRequest("La OT seleccionada no existe.");
-            if (!EstadosOTService.EsAbierta(ot.Estado)) return BadRequest(MSJ_OT_FINALIZADA);
+            if (ot.Estado == "Anulada") return BadRequest(MSJ_OT_ANULADA);
+            if (ot.Estado == "Cerrada") return BadRequest(MSJ_OT_CERRADA);
 
             NormalizarFechas(i);
             var error = ValidarFechas(i, ot);
@@ -90,7 +99,7 @@ namespace NODUS.API.Controllers
             await using var tx = await _db.Database.BeginTransactionAsync();
             _db.Intervenciones.Add(i);
             await _db.SaveChangesAsync();
-            var aviso = await _estados.RecalcularEstadoOT(i.IdOT);
+            var aviso = await _estados.RecalcularEstadoOT(i.IdOT, i.IdIntervencion);
             await tx.CommitAsync();
 
             return CreatedAtAction(nameof(GetIntervencion), new { id = i.IdIntervencion }, new { intervencion = i, mensaje = aviso });
@@ -109,13 +118,16 @@ namespace NODUS.API.Controllers
             var anterior = await _db.Intervenciones.AsNoTracking().FirstOrDefaultAsync(x => x.IdIntervencion == id);
             if (anterior == null) return NotFound();
 
-            // PBI-05: las tareas de una OT finalizada no se modifican (ni se mueven a una)
+            // Las tareas de una OT Cerrada sí se editan (por ejemplo, pasarla a Desaprobado la reabre);
+            // las de una OT Anulada no. Tampoco se mueven tareas desde o hacia una OT finalizada.
             var otAnterior = await _db.OrdenesTrabajo.AsNoTracking().FirstAsync(o => o.IdOT == anterior.IdOT);
-            if (!EstadosOTService.EsAbierta(otAnterior.Estado)) return BadRequest(MSJ_OT_FINALIZADA);
+            if (otAnterior.Estado == "Anulada") return BadRequest(MSJ_OT_ANULADA);
 
             var ot = await _db.OrdenesTrabajo.AsNoTracking().FirstOrDefaultAsync(o => o.IdOT == i.IdOT);
             if (ot == null) return BadRequest("La OT asociada no existe.");
-            if (!EstadosOTService.EsAbierta(ot.Estado)) return BadRequest(MSJ_OT_FINALIZADA);
+            if (anterior.IdOT != i.IdOT
+                && (!EstadosOTService.EsAbierta(otAnterior.Estado) || !EstadosOTService.EsAbierta(ot.Estado)))
+                return BadRequest(MSJ_MOVER_OT_FINALIZADA);
 
             NormalizarFechas(i);
             var error = ValidarFechas(i, ot);
@@ -125,7 +137,7 @@ namespace NODUS.API.Controllers
 
             await using var tx = await _db.Database.BeginTransactionAsync();
             await _db.SaveChangesAsync();
-            var aviso = await _estados.RecalcularEstadoOT(i.IdOT);
+            var aviso = await _estados.RecalcularEstadoOT(i.IdOT, i.IdIntervencion);
             if (anterior.IdOT != i.IdOT)
                 await _estados.RecalcularEstadoOT(anterior.IdOT);
             await tx.CommitAsync();
@@ -141,7 +153,7 @@ namespace NODUS.API.Controllers
             if (i == null) return NotFound();
 
             var ot = await _db.OrdenesTrabajo.AsNoTracking().FirstAsync(o => o.IdOT == i.IdOT);
-            if (!EstadosOTService.EsAbierta(ot.Estado)) return BadRequest(MSJ_OT_FINALIZADA);
+            if (!EstadosOTService.EsAbierta(ot.Estado)) return BadRequest(MSJ_ELIMINAR_OT_FINALIZADA);
 
             await using var tx = await _db.Database.BeginTransactionAsync();
             _db.Intervenciones.Remove(i);

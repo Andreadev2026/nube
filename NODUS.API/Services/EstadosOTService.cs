@@ -16,6 +16,11 @@ namespace NODUS.API.Services
 
         public const string MSJ_NO_CERRADA_SIN_APROBADO =
             "La OT no se cerró porque el resultado de seguridad eléctrica no es Aprobado.";
+        public const string MSJ_REABIERTA_POR_DESAPROBADO =
+            "La OT volvió a 'En curso' porque el resultado fue Desaprobado.";
+
+        // "Reprobado" es el nombre viejo de "Desaprobado" (quedan registros guardados así)
+        public static bool EsDesaprobado(string resultado) => resultado == "Desaprobado" || resultado == "Reprobado";
 
         private readonly NodusDbContext _db;
         private readonly ILogger<EstadosOTService> _logger;
@@ -28,45 +33,52 @@ namespace NODUS.API.Services
 
         public static bool EsAbierta(string estado) => estado == "Pendiente" || estado == "En curso";
 
-        // REGLA DE NEGOCIO: el estado de la OT se deriva de sus tareas de mantenimiento.
-        // Alguna tarea con fecha de fin y resultado "Aprobado" -> Cerrada (US-10);
-        // si no, alguna tarea -> En curso; sin tareas -> Pendiente.
-        // Solo recalcula OT abiertas: las Cerradas y Anuladas son inalterables (PBI-05).
+        // REGLA DE NEGOCIO: el estado de la OT lo define su tarea de mantenimiento más reciente
+        // (por fecha de inicio y, si empatan, por ID más alto):
+        // sin tareas -> Pendiente; la más reciente con fecha de fin y resultado "Aprobado" -> Cerrada (US-10);
+        // cualquier otro caso (Desaprobado, Aprobado con observaciones, sin fecha de fin) -> En curso.
+        // Así una tarea Desaprobado reabre una OT Cerrada. Las OT Anuladas no se tocan.
         // Guarda la OT y después recalcula el equipo, así la consulta de OT abiertas ve el estado nuevo.
-        // Devuelve un aviso para el usuario cuando hay fecha de fin pero la OT no se pudo cerrar.
-        public async Task<string?> RecalcularEstadoOT(int idOT)
+        // Si se pasa la tarea recién guardada y es la más reciente, devuelve un aviso para el usuario.
+        public async Task<string?> RecalcularEstadoOT(int idOT, int? idTareaGuardada = null)
         {
             var ot = await _db.OrdenesTrabajo.FindAsync(idOT);
-            if (ot == null || !EsAbierta(ot.Estado)) return null;
+            if (ot == null || ot.Estado == "Anulada") return null;
 
-            var tareas = await _db.Intervenciones
+            var ultima = await _db.Intervenciones
                 .Where(i => i.IdOT == idOT)
-                .Select(i => new { i.FechaFin, i.ResultadoSegElectrica })
-                .ToListAsync();
-
-            var finesAprobados = tareas
-                .Where(t => t.FechaFin.HasValue && t.ResultadoSegElectrica == "Aprobado")
-                .Select(t => t.FechaFin!.Value)
-                .ToList();
+                .OrderByDescending(i => i.Fecha).ThenByDescending(i => i.IdIntervencion)
+                .Select(i => new { i.IdIntervencion, i.FechaFin, i.ResultadoSegElectrica })
+                .FirstOrDefaultAsync();
 
             string? aviso = null;
             string estadoAnterior = ot.Estado;
-            if (finesAprobados.Count > 0)
+            if (ultima == null)
+            {
+                ot.Estado = "Pendiente";
+                ot.FechaCierre = null;
+            }
+            else if (ultima.FechaFin.HasValue && ultima.ResultadoSegElectrica == "Aprobado")
             {
                 ot.Estado = "Cerrada";
-                ot.FechaCierre = finesAprobados.Max();
+                ot.FechaCierre = ultima.FechaFin;
             }
             else
             {
-                ot.Estado = tareas.Count > 0 ? "En curso" : "Pendiente";
+                ot.Estado = "En curso";
                 ot.FechaCierre = null;
-                if (tareas.Any(t => t.FechaFin.HasValue))
-                    aviso = MSJ_NO_CERRADA_SIN_APROBADO;
+                if (ultima.IdIntervencion == idTareaGuardada)
+                {
+                    if (EsDesaprobado(ultima.ResultadoSegElectrica))
+                        aviso = MSJ_REABIERTA_POR_DESAPROBADO;
+                    else if (ultima.FechaFin.HasValue)
+                        aviso = MSJ_NO_CERRADA_SIN_APROBADO;
+                }
             }
 
             // TEMP: log de diagnóstico del recálculo de estado
-            _logger.LogInformation("[RecalcularEstadoOT] OT {IdOT}: {Tareas} tareas -> estado {Anterior} => {Final}",
-                idOT, tareas.Count, estadoAnterior, ot.Estado);
+            _logger.LogInformation("[RecalcularEstadoOT] OT {IdOT}: última tarea {Ultima} ({Resultado}, fin {Fin}) -> estado {Anterior} => {Final}",
+                idOT, ultima?.IdIntervencion, ultima?.ResultadoSegElectrica, ultima?.FechaFin, estadoAnterior, ot.Estado);
 
             await _db.SaveChangesAsync();
             await RecalcularEstadoEquipo(ot.IdEquipo);

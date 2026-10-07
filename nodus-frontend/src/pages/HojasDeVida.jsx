@@ -404,7 +404,8 @@ function HistoriaDetalle({ historia, colorMarca, colorTipo }) {
     const map = {
       'Aprobado':                       { bg: '#E1F5EE', fg: '#0F6E56' },
       'Aprobado con observaciones':     { bg: '#FAEEDA', fg: '#633806' },
-      'Reprobado':                      { bg: '#FAECE7', fg: '#712B13' },
+      'Desaprobado':                    { bg: '#FCEBEB', fg: '#A32D2D' },
+      'Reprobado':                      { bg: '#FCEBEB', fg: '#A32D2D' },
       'No aplica':                      { bg: '#F1EFE8', fg: '#444441' }
     };
     return map[r] || map['No aplica'];
@@ -637,7 +638,7 @@ function HistoriaDetalle({ historia, colorMarca, colorTipo }) {
                             <span style={{
                               display: 'inline-block', padding: '2px 8px', borderRadius: 999,
                               background: crSeg.bg, color: crSeg.fg, fontSize: 10, fontWeight: 600
-                            }}>⚡ {i.resultadoSegElectrica}</span>
+                            }}>⚡ {i.resultadoSegElectrica === 'Reprobado' ? 'Desaprobado' : i.resultadoSegElectrica}</span>
                             <span style={{ fontSize: 11, color: '#6B7C8C' }}>
                               {fmtTiempo(i.tiempoEmpleado)}
                             </span>

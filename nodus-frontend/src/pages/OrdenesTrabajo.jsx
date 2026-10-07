@@ -123,11 +123,12 @@ function OrdenesTrabajo() {
   // ─── PBI-05 ───
   const esEditable = (ot) => ot.estado !== 'Cerrada' && ot.estado !== 'Anulada';
 
-  // ─── US-10 ───
+  // ─── US-10: cuenta la tarea más reciente (por fecha de inicio y, si empatan, por ID), igual que el backend ───
   const tieneSegElectricaAprobada = (idOT) => {
-    return intervenciones.some(i =>
-      i.idOT === parseInt(idOT) && i.resultadoSegElectrica === 'Aprobado'
-    );
+    const ultima = intervenciones
+      .filter(i => i.idOT === parseInt(idOT))
+      .sort((a, b) => (b.fecha || '').localeCompare(a.fecha || '') || b.idIntervencion - a.idIntervencion)[0];
+    return ultima?.resultadoSegElectrica === 'Aprobado';
   };
 
   // ─── US-05: solo los equipos dados de baja no admiten OT ───

@@ -52,14 +52,17 @@ const CustomDateInput = forwardRef(({ value, onClick, placeholder }, ref) => (
 
 const RESULTADOS = [
   { nombre: 'Aprobado', icono: '✅', color: { bg: '#E1F5EE', fg: '#0F6E56' } },
-  { nombre: 'Aprobado con observaciones', icono: '⚠️', color: { bg: '#FAEEDA', fg: '#633806' } }
+  { nombre: 'Aprobado con observaciones', icono: '⚠️', color: { bg: '#FAEEDA', fg: '#633806' } },
+  { nombre: 'Desaprobado', icono: '❌', color: { bg: '#FCEBEB', fg: '#A32D2D' } }
 ];
 
-// Ya no se ofrecen en el formulario, pero hay registros guardados con estos valores
+// Ya no se ofrece en el formulario, pero hay registros guardados con este valor
 const RESULTADOS_HISTORICOS = [
-  { nombre: 'Reprobado', icono: '❌', color: { bg: '#FAECE7', fg: '#712B13' } },
   { nombre: 'No aplica', icono: '➖', color: { bg: '#F1EFE8', fg: '#444441' } }
 ];
+
+// "Reprobado" es el nombre viejo de "Desaprobado": los registros guardados así se muestran con el nombre nuevo
+const nombreResultado = (r) => (r === 'Reprobado' ? 'Desaprobado' : r);
 
 function Intervenciones() {
   const [intervenciones, setIntervenciones] = useState([]);
@@ -188,7 +191,7 @@ function Intervenciones() {
   const abrirModalEditar = (i) => {
     setTareasRealizadas(i.tareasRealizadas);
     setTiempoEmpleado(i.tiempoEmpleado.toString());
-    setResultadoSegElectrica(i.resultadoSegElectrica);
+    setResultadoSegElectrica(nombreResultado(i.resultadoSegElectrica));
     setFecha(i.fecha?.split('T')[0] || '');
     setFechaFin(i.fechaFin?.split('T')[0] || '');
     setIdOT(i.idOT);
@@ -290,7 +293,7 @@ function Intervenciones() {
   };
 
   const chipResultado = (r) => {
-    const found = [...RESULTADOS, ...RESULTADOS_HISTORICOS].find(x => x.nombre === r);
+    const found = [...RESULTADOS, ...RESULTADOS_HISTORICOS].find(x => x.nombre === nombreResultado(r));
     return found?.color || { bg: '#F1EFE8', fg: '#444441' };
   };
 
@@ -442,7 +445,7 @@ function Intervenciones() {
                           <span style={{
                             display: 'inline-block', padding: '2px 8px', borderRadius: 999,
                             background: cr.bg, color: cr.fg, fontSize: 10, fontWeight: 500
-                          }}>{i.resultadoSegElectrica}</span>
+                          }}>{nombreResultado(i.resultadoSegElectrica)}</span>
                         </div>
                       </div>
                     );
@@ -467,8 +470,8 @@ function Intervenciones() {
                     ? seleccionada.tareasRealizadas.substring(0, 80) + '...'
                     : seleccionada.tareasRealizadas || 'Sin descripción'}
                 </h1>
-                {/* Las tareas de una OT cerrada o anulada no se editan (PBI-05) */}
-                {!['Cerrada', 'Anulada'].includes(seleccionada.ordenTrabajo?.estado) && (
+                {/* Las tareas de una OT anulada no se editan; las de una cerrada sí (Desaprobado la reabre) */}
+                {seleccionada.ordenTrabajo?.estado !== 'Anulada' && (
                   <button
                     onClick={() => abrirModalEditar(seleccionada)}
                     className="btn-edit" title="Editar tarea"
@@ -525,7 +528,7 @@ function Intervenciones() {
                     background: chipResultado(seleccionada.resultadoSegElectrica).bg,
                     color: chipResultado(seleccionada.resultadoSegElectrica).fg,
                     fontSize: 12, fontWeight: 500
-                  }}>{seleccionada.resultadoSegElectrica}</span>
+                  }}>{nombreResultado(seleccionada.resultadoSegElectrica)}</span>
                 </FilaDetalle>
                 <FilaDetalle label="Fecha de inicio">
                   📅 {fmtFecha(seleccionada.fecha?.split('T')[0])}
@@ -824,7 +827,7 @@ function Intervenciones() {
               </div>
               {errores.resultadoSegElectrica && <span style={errStyle}>⚠ {errores.resultadoSegElectrica}</span>}
               <small style={{ display: 'block', marginTop: 8, fontSize: 11, color: '#9E9CBB', fontStyle: 'italic' }}>
-                Al cargar la fecha de fin, la OT se cierra solo si el resultado es "Aprobado" (US-10 · Riesgo Eléctrico Crítico).
+                Solo el resultado 'Aprobado' habilita el cierre de la OT (US-10 · Riesgo Eléctrico Crítico). Si el resultado es 'Desaprobado', la OT vuelve a 'En curso'.
               </small>
 
               {/* SECCIÓN 4: TAREAS REALIZADAS */}
