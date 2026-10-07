@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import api from '../api';
+import { useToast, mensajeDeError } from '../components/Toast';
 
 function Marcas() {
+  const toast = useToast();
   const [marcas, setMarcas] = useState([]);
   const [nombre, setNombre] = useState('');
   const [paisOrigen, setPaisOrigen] = useState('');
@@ -18,7 +20,7 @@ function Marcas() {
   };
 
   const guardar = async () => {
-    if (!nombre.trim()) { alert('El nombre es obligatorio.'); return; }
+    if (!nombre.trim()) { toast.warning('Falta el nombre', 'El nombre de la marca es obligatorio.'); return; }
     const data = { nombre, paisOrigen: paisOrigen || null, contactoSoporte: contacto || null,
       telefonoSoporte: telefono || null, emailSoporte: email || null };
     if (editando) {
@@ -37,7 +39,7 @@ function Marcas() {
   const eliminar = async (id, nom) => {
     if (!window.confirm(`¿Eliminar "${nom}"?`)) return;
     try { await api.delete(`/marcas/${id}`); cargarMarcas(); }
-    catch (err) { alert(err.response?.data || 'Error al eliminar.'); }
+    catch (err) { toast.error('No se pudo eliminar', mensajeDeError(err, 'Error al eliminar la marca.')); }
   };
 
   const limpiar = () => {

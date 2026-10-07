@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, forwardRef } from 'react';
 import api from '../api';
+import { useToast } from '../components/Toast';
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { FiCalendar } from "react-icons/fi";
@@ -67,6 +68,7 @@ const ESTADOS = [
 const ID_ESTADO_BAJA_PATRIMONIAL = 5;
 
 function OrdenesTrabajo() {
+  const toast = useToast();
   const [ots, setOts] = useState([]);
   const [equipos, setEquipos] = useState([]);
   const [servicios, setServicios] = useState([]);
@@ -197,7 +199,7 @@ function OrdenesTrabajo() {
   const intentarEditar = (o) => {
     if (!esEditable(o)) {
       // Muestra el mensaje PBI-05 en un banner (más discreto que alert)
-      alert('Consulta: Los registros finalizados son inalterables por auditoría.');
+      toast.warning('OT no editable', 'Los registros finalizados son inalterables por auditoría.');
       return;
     }
     setFechaApertura(o.fechaApertura?.split('T')[0] || '');

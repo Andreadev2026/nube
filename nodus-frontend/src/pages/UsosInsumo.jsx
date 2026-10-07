@@ -1,7 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
 import api from '../api';
+import { useToast, mensajeDeError } from '../components/Toast';
 
 function UsosInsumo() {
+  const toast = useToast();
   const [usos, setUsos] = useState([]);
   const [ots, setOts] = useState([]);
   const [insumos, setInsumos] = useState([]);
@@ -162,7 +164,7 @@ function UsosInsumo() {
       cargarUsos();
       cargarInsumos();
     } catch (err) {
-      alert(err.response?.data || 'No se pudo eliminar.');
+      toast.error('No se pudo eliminar', mensajeDeError(err, 'No se pudo eliminar el consumo.'));
     }
   };
 

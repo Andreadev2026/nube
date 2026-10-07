@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, forwardRef } from 'react';
 import api from '../api';
+import { useToast } from '../components/Toast';
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { FiCalendar } from "react-icons/fi";
@@ -64,7 +65,13 @@ const RESULTADOS_HISTORICOS = [
 // "Reprobado" es el nombre viejo de "Desaprobado": los registros guardados así se muestran con el nombre nuevo
 const nombreResultado = (r) => (r === 'Reprobado' ? 'Desaprobado' : r);
 
+const ID_ESTADO_EN_SERVICIO = 1;
+
+// Avisos que devuelve el backend (EstadosOTService) al guardar una tarea
+const AVISO_REABIERTA = "La OT volvió a 'En curso'";
+
 function Intervenciones() {
+  const toast = useToast();
   const [intervenciones, setIntervenciones] = useState([]);
   const [ots, setOts] = useState([]);
   const [usuarios, setUsuarios] = useState([]);
@@ -240,6 +247,7 @@ function Intervenciones() {
       idOT: parseInt(idOT),
       idUsuario: parseInt(idUsuario),
     };
+    const estadoOTAntes = otSeleccionada?.estado;
     try {
       const r = editando
         ? await api.put(`/intervenciones/${editando}`, { idIntervencion: editando, ...data })
@@ -247,13 +255,36 @@ function Intervenciones() {
       cerrarModal();
       cargarIntervenciones();
       cargarOTs();
-      // Aviso del backend, por ejemplo cuando hay fecha de fin pero la OT no se pudo cerrar (US-10)
-      if (r.data?.mensaje) alert(r.data.mensaje);
+      await avisarResultado(r.data?.mensaje, data.idOT, estadoOTAntes);
     } catch (err) {
       const mensaje = typeof err.response?.data === 'string'
         ? err.response.data
         : 'No se pudo guardar la tarea. Revisá los datos e intentá de nuevo.';
       setErrores({ __general: mensaje });
+    }
+  };
+
+  // El toast se muestra con el modal ya cerrado, para que no quede tapado
+  const avisarResultado = async (mensaje, idOTGuardada, estadoOTAntes) => {
+    if (mensaje?.startsWith(AVISO_REABIERTA)) {
+      toast.warning('OT reabierta', "La OT volvió a 'En curso' porque el resultado de seguridad eléctrica fue Desaprobado.");
+      return;
+    }
+    if (mensaje) {
+      toast.warning('OT no cerrada', mensaje);
+      return;
+    }
+    // Sin aviso del backend: se consulta la OT para saber si la tarea la cerró
+    let ot = null;
+    try { ot = (await api.get(`/ordenestrabajo/${idOTGuardada}`)).data; } catch { /* solo afecta al texto del aviso */ }
+    if (ot?.estado === 'Cerrada' && estadoOTAntes !== 'Cerrada') {
+      toast.success('OT cerrada', ot.equipo?.idEstado === ID_ESTADO_EN_SERVICIO
+        ? "La OT se cerró y el activo volvió a 'En servicio'."
+        : 'La OT se cerró.');
+    } else if (editando) {
+      toast.success('Tarea actualizada', 'Los cambios de la tarea de mantenimiento se guardaron correctamente.');
+    } else {
+      toast.success('Tarea registrada', 'La tarea de mantenimiento se guardó correctamente.');
     }
   };
 

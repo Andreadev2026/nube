@@ -1,7 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
 import api from '../api';
+import { useToast } from '../components/Toast';
 
 function HospitalesExternos() {
+  const toast = useToast();
   const [hospitales, setHospitales] = useState([]);
   const [busqueda, setBusqueda] = useState('');
   const [modalAbierto, setModalAbierto] = useState(false);
@@ -69,7 +71,7 @@ function HospitalesExternos() {
       await api.delete(`/hospitalesexternos/${h.idHospital}`);
       cargarHospitales();
     } catch {
-      alert('No se pudo eliminar el hospital.');
+      toast.error('No se pudo eliminar', 'No se pudo eliminar el hospital.');
     }
   };
 

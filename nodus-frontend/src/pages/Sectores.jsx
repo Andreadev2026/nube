@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import api from '../api';
+import { useToast, mensajeDeError } from '../components/Toast';
 
 function Sectores() {
+  const toast = useToast();
   const [sectores, setSectores] = useState([]);
   const [nombre, setNombre] = useState('');
   const [descripcion, setDescripcion] = useState('');
@@ -19,7 +21,7 @@ function Sectores() {
 
   const guardar = async () => {
     if (!nombre.trim()) {
-      alert('El nombre del sector es obligatorio.');
+      toast.warning('Falta el nombre', 'El nombre del sector es obligatorio.');
       return;
     }
     const data = {
@@ -36,7 +38,7 @@ function Sectores() {
       limpiar();
       cargarSectores();
     } catch (err) {
-      alert(err.response?.data || 'Error al guardar.');
+      toast.error('No se pudo guardar', mensajeDeError(err, 'Error al guardar el sector.'));
     }
   };
 
@@ -53,7 +55,7 @@ function Sectores() {
       await api.delete(`/sectores/${id}`);
       cargarSectores();
     } catch (err) {
-      alert(err.response?.data || 'Error al eliminar.');
+      toast.error('No se pudo eliminar', mensajeDeError(err, 'Error al eliminar el sector.'));
     }
   };
 

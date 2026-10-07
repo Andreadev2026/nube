@@ -1,7 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
 import api from '../api';
+import { useToast, mensajeDeError } from '../components/Toast';
 
 function HojasDeVida() {
+  const toast = useToast();
   const [hojas, setHojas] = useState([]);
   const [historia, setHistoria] = useState(null);
   const [equipoSeleccionadoId, setEquipoSeleccionadoId] = useState(null);
@@ -61,11 +63,11 @@ function HojasDeVida() {
   const generarParaTodos = async () => {
     try {
       const r = await api.post('/hojasdevida/generar-para-todos');
-      alert(r.data.mensaje || 'Hojas de vida generadas correctamente.');
+      toast.success('Hojas de vida generadas', r.data.mensaje || 'Hojas de vida generadas correctamente.');
       setModalMasivo(false);
       cargarHojas();
     } catch (err) {
-      alert(err.response?.data || 'Error al generar.');
+      toast.error('No se pudo generar', mensajeDeError(err, 'Error al generar las hojas de vida.'));
     }
   };
 
@@ -76,7 +78,7 @@ function HojasDeVida() {
       const r = await api.get(`/hojasdevida/equipo/${idEquipo}/historia`);
       setHistoria(r.data);
     } catch (err) {
-      alert(err.response?.data || 'Error al cargar historia.');
+      toast.error('No se pudo cargar', mensajeDeError(err, 'Error al cargar la historia del equipo.'));
       setHistoria(null);
     } finally {
       setCargandoHistoria(false);

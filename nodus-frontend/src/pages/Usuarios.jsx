@@ -1,9 +1,11 @@
 import { useState, useEffect, useMemo } from 'react';
 import api from '../api';
+import { useToast, mensajeDeError } from '../components/Toast';
 
 const ROLES = ['Técnico biomédico', 'Jefe patrimonio', 'Jefe servicio', 'Auditor ANMAT', 'Administrador', 'Médico', 'Residente', 'Enfermero'];
 
 function Usuarios() {
+  const toast = useToast();
   const [usuarios, setUsuarios] = useState([]);
 
   // Campos del formulario
@@ -89,7 +91,7 @@ function Usuarios() {
       await api.delete(`/usuarios/${u.idUsuario}`);
       cargarUsuarios();
     } catch (err) {
-      alert(err.response?.data || 'No se pudo eliminar. Puede tener registros asociados.');
+      toast.error('No se pudo eliminar', mensajeDeError(err, 'Puede tener registros asociados.'));
     }
   };
 

@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef, forwardRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import api from '../api';
+import { useToast } from '../components/Toast';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { FiCalendar } from 'react-icons/fi';
@@ -48,6 +49,7 @@ const CustomDateInputMini = forwardRef(({ value, onClick, placeholder }, ref) =>
 ));
 
 function Reportes() {
+  const toast = useToast();
   const navigate = useNavigate();
   const location = useLocation();
   const [equipos, setEquipos] = useState([]);
@@ -625,7 +627,7 @@ function Reportes() {
       pdf.save(`NODUS_Dashboard_${new Date().toISOString().split('T')[0]}.pdf`);
     } catch (err) {
       console.error(err);
-      alert('Error al exportar el PDF.');
+      toast.error('No se pudo exportar', 'Error al exportar el PDF.');
     } finally {
       setExportando(false);
     }

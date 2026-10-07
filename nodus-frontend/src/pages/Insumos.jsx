@@ -1,7 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
 import api from '../api';
+import { useToast, mensajeDeError } from '../components/Toast';
 
 function Insumos() {
+  const toast = useToast();
   const [insumos, setInsumos] = useState([]);
 
   // Campos del formulario
@@ -95,7 +97,7 @@ function Insumos() {
       await api.delete(`/insumos/${i.idInsumo}`);
       cargarInsumos();
     } catch (err) {
-      alert(err.response?.data || 'No se pudo eliminar. Puede tener movimientos asociados.');
+      toast.error('No se pudo eliminar', mensajeDeError(err, 'Puede tener movimientos asociados.'));
     }
   };
 

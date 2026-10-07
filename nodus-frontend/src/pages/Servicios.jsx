@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import api from '../api';
+import { useToast, mensajeDeError } from '../components/Toast';
 
 function Servicios() {
+  const toast = useToast();
   const [servicios, setServicios] = useState([]);
   const [nombre, setNombre] = useState('');
   const [sector, setSector] = useState('');
@@ -18,7 +20,7 @@ function Servicios() {
 
   const guardar = async () => {
     if (!nombre.trim()) {
-      alert('El nombre del servicio es obligatorio.');
+      toast.warning('Falta el nombre', 'El nombre del servicio es obligatorio.');
       return;
     }
     const data = {
@@ -34,7 +36,7 @@ function Servicios() {
       limpiar();
       cargarServicios();
     } catch (err) {
-      alert(err.response?.data || 'Error al guardar.');
+      toast.error('No se pudo guardar', mensajeDeError(err, 'Error al guardar el servicio.'));
     }
   };
 
@@ -50,7 +52,7 @@ function Servicios() {
       await api.delete(`/servicios/${id}`);
       cargarServicios();
     } catch (err) {
-      alert(err.response?.data || 'Error al eliminar.');
+      toast.error('No se pudo eliminar', mensajeDeError(err, 'Error al eliminar el servicio.'));
     }
   };
 

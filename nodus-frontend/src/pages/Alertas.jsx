@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import api from '../api';
+import { useToast, mensajeDeError } from '../components/Toast';
 
 const TIPOS = [
   'Garantía por vencer',
@@ -12,6 +13,7 @@ const TIPOS = [
 const ESTADOS = ['No leída', 'Leída', 'Resuelta', 'Descartada'];
 
 function Alertas({ auth }) {
+  const toast = useToast();
   const [alertas, setAlertas] = useState([]);
   const [equipos, setEquipos] = useState([]);
   const [usuarios, setUsuarios] = useState([]);
@@ -39,7 +41,7 @@ function Alertas({ auth }) {
 
   const guardar = async () => {
     if (!tipo || !fechaGeneracion || !idUsuario) {
-      alert('Tipo, fecha y usuario reportador son obligatorios.'); return;
+      toast.warning('Faltan datos', 'Tipo, fecha y usuario reportador son obligatorios.'); return;
     }
     const data = {
       tipo,
@@ -57,7 +59,7 @@ function Alertas({ auth }) {
       limpiar();
       cargarAlertas();
     } catch (err) {
-      alert(err.response?.data || 'Error al guardar.');
+      toast.error('No se pudo guardar', mensajeDeError(err, 'Error al guardar la alerta.'));
     }
   };
 
@@ -76,7 +78,7 @@ function Alertas({ auth }) {
       await api.delete(`/alertas/${id}`);
       cargarAlertas();
     } catch (err) {
-      alert(err.response?.data || 'Error al eliminar.');
+      toast.error('No se pudo eliminar', mensajeDeError(err, 'Error al eliminar la alerta.'));
     }
   };
 
@@ -86,22 +88,22 @@ function Alertas({ auth }) {
       await api.put(`/alertas/${alerta.idAlerta}`, { ...alerta, estado: nuevoEstado });
       cargarAlertas();
     } catch (err) {
-      alert(err.response?.data || 'Error al actualizar estado.');
+      toast.error('No se pudo actualizar', mensajeDeError(err, 'Error al actualizar el estado de la alerta.'));
     }
   };
 
   // Generar alertas automáticas
   const generarAutomaticas = async () => {
     if (!auth?.usuario?.idUsuario) {
-      alert('No se pudo identificar el usuario actual.'); return;
+      toast.error('Usuario no identificado', 'No se pudo identificar el usuario actual.'); return;
     }
     if (!window.confirm('El sistema buscará equipos con garantía por vencer e insumos con stock bajo y creará alertas automáticamente. ¿Continuar?')) return;
     try {
       const r = await api.post(`/alertas/generar-automaticas?idUsuarioReportador=${auth.usuario.idUsuario}`);
-      alert(r.data.mensaje);
+      toast.success('Alertas generadas', r.data.mensaje);
       cargarAlertas();
     } catch (err) {
-      alert(err.response?.data || 'Error al generar automáticas.');
+      toast.error('No se pudieron generar', mensajeDeError(err, 'Error al generar las alertas automáticas.'));
     }
   };
 
