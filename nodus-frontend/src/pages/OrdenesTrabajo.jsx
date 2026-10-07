@@ -52,9 +52,7 @@ const CustomDateInput = forwardRef(({ value, onClick, placeholder }, ref) => (
 
 const TIPOS = [
   { nombre: 'Correctiva', icono: '🔧' },
-  { nombre: 'Preventiva', icono: '📆' },
-  { nombre: 'Calibración', icono: '📐' },
-  { nombre: 'Verificación de seguridad eléctrica', icono: '⚡' }
+  { nombre: 'Preventiva', icono: '📆' }
 ];
 
 const ESTADOS = [
@@ -63,6 +61,9 @@ const ESTADOS = [
   { nombre: 'Cerrada',   color: { bg: '#E1F5EE', fg: '#0F6E56' } },
   { nombre: 'Anulada',   color: { bg: '#F1EFE8', fg: '#444441' } }
 ];
+
+// "Anulada" se sigue listando para las OT ya guardadas, pero no se ofrece en el formulario
+const ESTADOS_SELECCIONABLES = ESTADOS.filter(e => e.nombre !== 'Anulada');
 
 function OrdenesTrabajo() {
   const [ots, setOts] = useState([]);
@@ -823,7 +824,7 @@ function OrdenesTrabajo() {
               <div style={{ marginTop: 22 }}>
                 <SeccionTitulo icono="🚦" titulo="Estado de la OT" />
                 <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 10 }}>
-                  {ESTADOS.map(e => {
+                  {ESTADOS_SELECCIONABLES.map(e => {
                     const seleccionado = estado === e.nombre;
                     const c = e.color;
                     return (
