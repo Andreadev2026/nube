@@ -57,6 +57,8 @@ const CustomDateInput = forwardRef(({ value, onClick }, ref) => (
   </div>
 ));
 
+const ID_ESTADO_EN_SERVICIO = 1;
+
 function Activos() {
   const [equipos, setEquipos] = useState([]);
   const [marcas, setMarcas] = useState([]);
@@ -78,7 +80,6 @@ function Activos() {
   const [fechaGar, setFechaGar] = useState('');
   const [idMarca, setIdMarca] = useState('');
   const [idTipo, setIdTipo] = useState('');
-  const [idEstado, setIdEstado] = useState('');
   const [editando, setEditando] = useState(null);
   const [errores, setErrores] = useState({});
   const [componentesSeleccionados, setComponentesSeleccionados] = useState([]);
@@ -175,7 +176,6 @@ function Activos() {
     setFechaGar(eq.vencimientoGarantia?.split('T')[0] || '');
     setIdMarca(eq.idMarca);
     setIdTipo(eq.idTipo);
-    setIdEstado(eq.idEstado);
     setEditando(eq.idEquipo);
     setErrores({});
     setComponentesSeleccionados(eq.componentes || []);
@@ -188,13 +188,12 @@ function Activos() {
     if (!modelo || !modelo.trim()) errs.modelo = 'Falta ingresar el modelo del activo';
     if (!nroSerie || !nroSerie.trim()) errs.nroSerie = 'El N° de Serie es obligatorio para el registro legal';
     if (!fechaAdq) errs.fechaAdq = 'Falta seleccionar la fecha de adquisición';
-    else if (new Date(fechaAdq) > hoy)
+    else if (fechaAdq > hoy.toLocaleDateString('en-CA')) errs.fechaAdq = 'La fecha de adquisición no puede ser futura';
     if (fechaGar && fechaAdq && fechaGar < fechaAdq) {
       errs.fechaGar = 'La garantía no puede ser anterior a la adquisición';
     }
     if (!idMarca) errs.idMarca = 'Falta seleccionar la marca';
     if (!idTipo) errs.idTipo = 'Falta seleccionar el tipo de activo';
-    if (!idEstado) errs.idEstado = 'Falta seleccionar el estado actual';
     return errs;
   };
 
@@ -209,7 +208,10 @@ function Activos() {
       vencimientoGarantia: fechaGar || null,
       idMarca: parseInt(idMarca),
       idTipo: parseInt(idTipo),
-      idEstado: parseInt(idEstado),
+      // Alta: siempre "En servicio". Edición: se conserva el estado actual del equipo.
+      idEstado: editando
+        ? equipos.find(e => e.idEquipo === editando)?.idEstado
+        : ID_ESTADO_EN_SERVICIO,
       componentes: componentesSeleccionados
     };
     try {
@@ -230,7 +232,7 @@ function Activos() {
 
   const limpiar = () => {
     setModelo(''); setNroSerie(''); setFechaAdq(''); setFechaGar('');
-    setIdMarca(''); setIdTipo(''); setIdEstado(''); setEditando(null);
+    setIdMarca(''); setIdTipo(''); setEditando(null);
     setErrores({});
     setComponentesSeleccionados([]);
     setBuscadorMarca(''); setMostrarListaMarca(false);
@@ -1078,55 +1080,6 @@ function Activos() {
                 )}
               </div>
 
-              {/* ═══ SECCIÓN 3: ESTADO (con chips visuales) ═══ */}
-              <SeccionTitulo icono="🚦" titulo="Estado operativo actual" />
-              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 6 }}>
-                {estados
-                  .filter(s => s.nombre !== 'En préstamo' || String(idEstado) === String(s.idEstado))
-                  .map(s => {
-                  const seleccionado = String(idEstado) === String(s.idEstado);
-                  const c = chipEstado(s.colorSemaforo);
-                  const esPrestamo = s.nombre === 'En préstamo';
-                  return (
-                    <button
-                      key={s.idEstado}
-                      type="button"
-                      disabled={esPrestamo}
-                      onClick={() => { if (!esPrestamo) cambiarCampo('idEstado', s.idEstado, setIdEstado); }}
-                      title={esPrestamo ? 'Este estado se gestiona automáticamente desde Gestión de Préstamos' : undefined}
-                      style={{
-                        padding: '10px 16px',
-                        borderRadius: 10,
-                        border: seleccionado ? `2px solid ${c.fg}` : '2px solid #E5EDF3',
-                        background: seleccionado ? c.bg : 'white',
-                        color: seleccionado ? c.fg : '#6B7C8C',
-                        fontSize: 13,
-                        fontWeight: seleccionado ? 600 : 500,
-                        cursor: esPrestamo ? 'not-allowed' : 'pointer',
-                        opacity: esPrestamo ? 0.85 : 1,
-                        transition: 'all 0.15s',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 8,
-                        boxShadow: seleccionado ? `0 2px 8px ${c.bg}` : 'none'
-                      }}
-                    >
-                      <span style={{
-                        width: 10, height: 10, borderRadius: '50%',
-                        background: c.fg, opacity: seleccionado ? 1 : 0.4
-                      }}></span>
-                      {s.nombre}
-                      {esPrestamo && <span style={{ fontSize: 11 }}>🔒</span>}
-                    </button>
-                  );
-                })}
-              </div>
-              {String(idEstado) === String(estados.find(s => s.nombre === 'En préstamo')?.idEstado) && (
-                <div style={{ fontSize: 11, color: '#0C447C', background: '#E6F1FB', borderRadius: 8, padding: '8px 12px', marginBottom: 6 }}>
-                  ℹ Este equipo está en préstamo. Para registrar la devolución, hacelo desde <strong>Gestión de Préstamos</strong>.
-                </div>
-              )}
-              {errores.idEstado && <span style={errStyle}>⚠ {errores.idEstado}</span>}
             </div>
 
             {/* FOOTER */}

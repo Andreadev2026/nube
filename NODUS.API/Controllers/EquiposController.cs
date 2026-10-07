@@ -10,6 +10,8 @@ namespace NODUS.API.Controllers
     [ApiController]
     public class EquiposController : ControllerBase
     {
+        private const int ID_ESTADO_EN_SERVICIO = 1;
+
         private readonly NodusDbContext _db;
 
         public EquiposController(NodusDbContext db)
@@ -137,7 +139,8 @@ namespace NODUS.API.Controllers
                     : null,
                 IdMarca = input.IdMarca,
                 IdTipo = input.IdTipo,
-                IdEstado = input.IdEstado,
+                // REGLA: todo equipo nuevo nace "En servicio"; se ignora el estado enviado por el cliente
+                IdEstado = ID_ESTADO_EN_SERVICIO,
                 EquipoComponentes = (input.Componentes ?? new List<string>())
                     .Select(nombre => new EquipoComponente { Componente = nombre })
                     .ToList()
@@ -173,7 +176,7 @@ namespace NODUS.API.Controllers
                 : null;
             equipo.IdMarca = input.IdMarca;
             equipo.IdTipo = input.IdTipo;
-            equipo.IdEstado = input.IdEstado;
+            // El estado no se edita desde acá: lo gestionan OTs, bajas patrimoniales y préstamos
 
             // Reemplazar por completo el set de componentes marcados
             _db.RemoveRange(equipo.EquipoComponentes);
