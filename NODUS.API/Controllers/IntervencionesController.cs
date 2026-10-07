@@ -16,11 +16,11 @@ namespace NODUS.API.Controllers
         private static readonly string[] RESULTADOS_VALIDOS = {
             "Aprobado",
             "Aprobado con observaciones",
-            "Desaprobado",
-            // Valores viejos: ya no se ofrecen, pero quedan tareas guardadas con ellos
-            "Reprobado",
-            "No aplica"
+            "Desaprobado"
         };
+
+        private static readonly string MSJ_RESULTADO_INVALIDO =
+            $"Resultado inválido. Valores permitidos: {string.Join(", ", RESULTADOS_VALIDOS)}.";
 
         private const string MSJ_OT_CERRADA =
             "No se pueden registrar tareas nuevas en una OT cerrada. Si hay que reabrirla, editá su última tarea con resultado Desaprobado.";
@@ -83,7 +83,7 @@ namespace NODUS.API.Controllers
             if (i.TiempoEmpleado <= 0)
                 return BadRequest("El tiempo empleado debe ser mayor a 0 minutos.");
             if (!RESULTADOS_VALIDOS.Contains(i.ResultadoSegElectrica))
-                return BadRequest($"Resultado inválido. Valores permitidos: {string.Join(", ", RESULTADOS_VALIDOS)}.");
+                return BadRequest(MSJ_RESULTADO_INVALIDO);
 
             // La OT tiene que existir y seguir abierta
             var ot = await _db.OrdenesTrabajo.AsNoTracking().FirstOrDefaultAsync(o => o.IdOT == i.IdOT);
@@ -112,8 +112,11 @@ namespace NODUS.API.Controllers
             if (id != i.IdIntervencion) return BadRequest();
             if (i.TiempoEmpleado <= 0)
                 return BadRequest("El tiempo empleado debe ser mayor a 0 minutos.");
+            // "Reprobado" es el nombre viejo de "Desaprobado": al editar una tarea vieja se guarda con el nombre nuevo
+            if (i.ResultadoSegElectrica == "Reprobado")
+                i.ResultadoSegElectrica = "Desaprobado";
             if (!RESULTADOS_VALIDOS.Contains(i.ResultadoSegElectrica))
-                return BadRequest("Resultado inválido.");
+                return BadRequest(MSJ_RESULTADO_INVALIDO);
 
             var anterior = await _db.Intervenciones.AsNoTracking().FirstOrDefaultAsync(x => x.IdIntervencion == id);
             if (anterior == null) return NotFound();
