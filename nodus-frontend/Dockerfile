@@ -10,6 +10,11 @@ RUN npm ci
 ARG VITE_API_URL=/api
 ENV VITE_API_URL=$VITE_API_URL
 
+# Dirección con la que los celulares llegan al sistema (ej. http://192.168.x.x o https://nodus.dominio):
+# se usa para armar la URL de los QR de los equipos. Vacía = el origen desde el que se abre la app.
+ARG VITE_PUBLIC_BASE_URL=
+ENV VITE_PUBLIC_BASE_URL=$VITE_PUBLIC_BASE_URL
+
 COPY . .
 RUN npm run build
 

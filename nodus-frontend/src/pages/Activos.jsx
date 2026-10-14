@@ -8,6 +8,7 @@ import {
   DIAS_AVISO_GARANTIA, EVENTO_EQUIPOS_ACTUALIZADOS,
   diasParaVencerGarantia, garantiaPorVencer, garantiaVencida, textoVence
 } from '../vencimientos';
+import { urlQrEquipo, apuntaALocalhost, imagenQr, AVISO_QR_LOCALHOST } from '../qr';
 
 // "2026-10-03T00:00:00Z" → "03/10/2026"
 const fechaDMY = (iso) => iso ? iso.split('T')[0].split('-').reverse().join('/') : '—';
@@ -1185,11 +1186,19 @@ function Activos() {
                 <div style={{ fontSize: 13, color: '#6B7C8C', marginTop: 2 }}>S/N {modalQrEquipo.nroSerie}</div>
               </div>
               <img
-                src={`https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(`${window.location.origin}/equipos/${modalQrEquipo.idEquipo}/qr`)}`}
+                src={imagenQr(urlQrEquipo(modalQrEquipo.idEquipo))}
                 alt={`Codigo QR de ${modalQrEquipo.modelo}`}
                 style={{ width: 260, height: 260, margin: '0 auto' }}
               />
             </div>
+            {apuntaALocalhost(urlQrEquipo(modalQrEquipo.idEquipo)) && (
+              <div role="alert" className="no-print" style={{
+                marginTop: 14, padding: '10px 12px', borderRadius: 8, fontSize: 13, fontWeight: 600, lineHeight: 1.4,
+                background: '#FFF4E5', color: '#8A4B00', border: '1px solid #F5C27A', textAlign: 'left'
+              }}>
+                ⚠ {AVISO_QR_LOCALHOST}
+              </div>
+            )}
             <div className="no-print" style={{ display:'flex', justifyContent:'flex-end', gap:10, marginTop:18, paddingTop:14, borderTop:'1px solid #eee' }}>
               <button onClick={() => setModalQrEquipo(null)} style={btnGhost}>Cerrar</button>
               <button onClick={() => window.print()} style={btnSave}>Imprimir</button>
