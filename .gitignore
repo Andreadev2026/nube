@@ -21,3 +21,6 @@ Thumbs.db
 
 # Remitos PDF generados por la API (se regeneran a pedido)
 NODUS.API/Storage/
+
+# Certificados locales para HTTPS (docker-compose.https.yml)
+certs/
