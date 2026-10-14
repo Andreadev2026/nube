@@ -26,6 +26,15 @@ namespace NODUS.API.DTOs
         public string? NombreCompleto { get; set; }
         public string? Legajo { get; set; }
         public string? Descripcion { get; set; }
+        // Servicio desde el que se reporta (obligatorio)
+        public int? ServicioId { get; set; }
+    }
+
+    // Opción del catálogo de servicios para el formulario de reporte
+    public class ServicioCatalogoDto
+    {
+        public int IdServicio { get; set; }
+        public string Nombre { get; set; } = string.Empty;
     }
 
     public class ConvertirEnOTInputDto
@@ -44,6 +53,7 @@ namespace NODUS.API.DTOs
         public string Legajo { get; set; } = string.Empty;
         public string? Usuario { get; set; }
         public string Descripcion { get; set; } = string.Empty;
+        public string? Servicio { get; set; }
         public DateTime FechaReporte { get; set; }
         public string Estado { get; set; } = string.Empty;
         public int? IdOT { get; set; }

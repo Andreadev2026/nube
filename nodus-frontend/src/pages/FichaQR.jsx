@@ -11,7 +11,7 @@ export const CLAVE_ULTIMO_QR = 'nodus_ultimo_qr';
 
 const MAX = { nombreCompleto: 100, legajo: 30, descripcion: 1000 };
 const MSJ_DUPLICADO = 'Este equipo ya tiene una falla reportada hoy. Mantenimiento ya fue notificado.';
-const FORM_VACIO = { nombreCompleto: '', legajo: '', descripcion: '' };
+const FORM_VACIO = { nombreCompleto: '', legajo: '', servicioId: '', descripcion: '' };
 const NO_ENCONTRADO = 'no_encontrado';
 
 // Con key por equipo, el estado (formulario, aviso) arranca de cero al pasar a otro QR
@@ -31,6 +31,9 @@ function FichaQREquipo({ idEquipo, auth, onLogout }) {
   const [enviando, setEnviando] = useState(false);
   // 'cargado': ya estaba reportado al abrir la ficha; 'conflicto': otra persona reportó mientras se escribía
   const [aviso, setAviso] = useState(null);
+  // Catálogo de servicios para el campo "Servicio" (null mientras carga)
+  const [servicios, setServicios] = useState(null);
+  const [errorServicios, setErrorServicios] = useState(false);
 
   const rol = auth?.usuario?.rol;
   const esPersonalAsistencial = rol === ROL_PERSONAL_ASISTENCIAL;
@@ -56,6 +59,18 @@ function FichaQREquipo({ idEquipo, auth, onLogout }) {
     return () => { cancelado = true; };
   }, [idEquipo]);
 
+  useEffect(() => {
+    if (!puedeReportar) return;
+    let cancelado = false;
+    api.get('/servicios/catalogo')
+      .then(r => { if (!cancelado) setServicios(r.data); })
+      .catch(() => { if (!cancelado) setErrorServicios(true); });
+    return () => { cancelado = true; };
+  }, [puedeReportar]);
+
+  // Sin servicios para elegir no se puede enviar el reporte
+  const sinServicios = errorServicios || servicios?.length === 0;
+
   const cambiar = (campo, valor) => {
     setForm(f => ({ ...f, [campo]: valor }));
     if (errores[campo]) setErrores(e => { const n = { ...e }; delete n[campo]; return n; });
@@ -69,18 +84,20 @@ function FichaQREquipo({ idEquipo, auth, onLogout }) {
       if (!v) e[campo] = `Falta completar ${etiquetas[campo]}`;
       else if (v.length > MAX[campo]) e[campo] = `Máximo ${MAX[campo]} caracteres`;
     }
+    if (!form.servicioId) e.servicioId = 'Falta completar el servicio';
     setErrores(e);
     return Object.keys(e).length === 0;
   };
 
   const enviar = async (e) => {
     e.preventDefault();
-    if (enviando || aviso || !validar()) return;
+    if (enviando || aviso || sinServicios || !validar()) return;
     setEnviando(true);
     try {
       await api.post(`/equipos/${idEquipo}/reportes-falla`, {
         nombreCompleto: form.nombreCompleto.trim(),
         legajo: form.legajo.trim(),
+        servicioId: parseInt(form.servicioId),
         descripcion: form.descripcion.trim()
       });
       toast.success('Reporte enviado', 'Mantenimiento recibió tu aviso');
@@ -223,6 +240,26 @@ function FichaQREquipo({ idEquipo, auth, onLogout }) {
                   disabled={!!aviso} style={inputStyle(errores.legajo)}
                 />
               </Campo>
+              <Campo label="Servicio" error={errores.servicioId}>
+                <select
+                  value={form.servicioId} onChange={e => cambiar('servicioId', e.target.value)}
+                  disabled={!!aviso || !servicios?.length}
+                  style={{ ...inputStyle(errores.servicioId), ...selectStyle }}
+                >
+                  <option value="">{servicios === null && !errorServicios ? 'Cargando servicios...' : 'Seleccionar...'}</option>
+                  {servicios?.map(s => <option key={s.idServicio} value={s.idServicio}>{s.nombre}</option>)}
+                </select>
+              </Campo>
+              {sinServicios && (
+                <div role="alert" style={{
+                  background: '#FAECE7', border: '1px solid #F0C9BC', borderRadius: 10, padding: '10px 12px',
+                  fontSize: 13, color: '#712B13', lineHeight: 1.45, marginTop: -4, marginBottom: 12
+                }}>
+                  {errorServicios
+                    ? 'No se pudo cargar la lista de servicios. Recargá la página para poder enviar el reporte.'
+                    : 'No hay servicios cargados en el sistema. Avisá a mantenimiento para poder enviar el reporte.'}
+                </div>
+              )}
               <Campo label="Descripción del problema" error={errores.descripcion}
                 ayuda={`${form.descripcion.length}/${MAX.descripcion}`}>
                 <textarea
@@ -231,8 +268,8 @@ function FichaQREquipo({ idEquipo, auth, onLogout }) {
                   disabled={!!aviso} style={{ ...inputStyle(errores.descripcion), resize: 'vertical', minHeight: 96 }}
                 />
               </Campo>
-              <button type="submit" disabled={enviando || !!aviso}
-                style={{ ...btnSave, opacity: enviando || aviso ? 0.6 : 1, cursor: enviando || aviso ? 'not-allowed' : 'pointer' }}>
+              <button type="submit" disabled={enviando || !!aviso || sinServicios}
+                style={{ ...btnSave, opacity: enviando || aviso || sinServicios ? 0.6 : 1, cursor: enviando || aviso || sinServicios ? 'not-allowed' : 'pointer' }}>
                 {enviando ? 'Enviando...' : 'Enviar reporte'}
               </button>
             </form>
@@ -300,6 +337,12 @@ const inputStyle = (error) => ({
   border: `1px solid ${error ? '#E8A5A5' : '#E5EDF3'}`, background: 'white', color: '#1a1a1a',
   fontFamily: 'inherit', outline: 'none'
 });
+// Select con la misma caja que los inputs y una flecha propia (sin el aspecto nativo)
+const selectStyle = {
+  appearance: 'none', WebkitAppearance: 'none', paddingRight: 36, cursor: 'pointer',
+  backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2 4l4 4 4-4' fill='none' stroke='%236B7C8C' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E\")",
+  backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center'
+};
 const btnGhost = {
   background: 'white', color: '#6B7C8C', border: '1px solid #E5EDF3',
   padding: '12px 18px', borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer', width: '100%'

@@ -842,6 +842,10 @@ namespace NODUS.Data.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("id_ot");
 
+                    b.Property<int?>("IdServicio")
+                        .HasColumnType("integer")
+                        .HasColumnName("id_servicio");
+
                     b.Property<int>("IdUsuario")
                         .HasColumnType("integer")
                         .HasColumnName("id_usuario");
@@ -863,6 +867,8 @@ namespace NODUS.Data.Migrations
                     b.HasIndex("Estado");
 
                     b.HasIndex("IdOT");
+
+                    b.HasIndex("IdServicio");
 
                     b.HasIndex("IdUsuario");
 
@@ -1374,6 +1380,11 @@ namespace NODUS.Data.Migrations
                         .HasForeignKey("IdOT")
                         .OnDelete(DeleteBehavior.Restrict);
 
+                    b.HasOne("NODUS.Models.Servicio", "Servicio")
+                        .WithMany()
+                        .HasForeignKey("IdServicio")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("NODUS.Models.Usuario", "Usuario")
                         .WithMany()
                         .HasForeignKey("IdUsuario")
@@ -1383,6 +1394,8 @@ namespace NODUS.Data.Migrations
                     b.Navigation("Equipo");
 
                     b.Navigation("OrdenTrabajo");
+
+                    b.Navigation("Servicio");
 
                     b.Navigation("Usuario");
                 });

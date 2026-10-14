@@ -1,5 +1,8 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using NODUS.API.DTOs;
+using NODUS.API.Services;
 using NODUS.Data;
 using NODUS.Models;
 
@@ -22,6 +25,21 @@ namespace NODUS.API.Controllers
         {
             var servicios = await _db.Servicios
                 .OrderBy(s => s.Nombre)
+                .ToListAsync();
+            return Ok(servicios);
+        }
+
+        // GET: api/servicios/catalogo
+        // Solo id y nombre, para el formulario de reporte de falla de la ficha QR: lo usa cualquier usuario
+        // logueado, incluido Personal asistencial. (Servicio no tiene baja lógica: todos están activos.)
+        [HttpGet("catalogo")]
+        [Authorize(Policy = Politicas.CualquierUsuario)]
+        public async Task<ActionResult<IEnumerable<ServicioCatalogoDto>>> GetCatalogo()
+        {
+            var servicios = await _db.Servicios
+                .AsNoTracking()
+                .OrderBy(s => s.Nombre)
+                .Select(s => new ServicioCatalogoDto { IdServicio = s.IdServicio, Nombre = s.Nombre })
                 .ToListAsync();
             return Ok(servicios);
         }

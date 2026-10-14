@@ -42,12 +42,12 @@ function ReportesFalla() {
     api.get('/servicios').then(r => setServicios(r.data)).catch(() => { /* el modal avisa si falta */ });
   }, []);
 
-  // Filtra en el momento sobre equipo (nombre y serie), quién reportó (nombre y legajo) y descripción
+  // Filtra en el momento sobre equipo (nombre y serie), quién reportó (nombre y legajo), servicio y descripción
   const visibles = useMemo(() => {
     const q = normalizar(busqueda.trim());
     if (!q) return reportes;
     return reportes.filter(r =>
-      [r.equipo, r.nroSerie, r.nombreCompleto, r.legajo, r.descripcion].some(c => normalizar(c).includes(q))
+      [r.equipo, r.nroSerie, r.nombreCompleto, r.legajo, r.servicio, r.descripcion].some(c => normalizar(c).includes(q))
     );
   }, [reportes, busqueda]);
 
@@ -113,7 +113,7 @@ function ReportesFalla() {
             <span className="rf-lupa">🔍</span>
             <input
               type="text" value={busqueda} onChange={e => setBusqueda(e.target.value)}
-              placeholder="Buscar por equipo, quién reportó o descripción..."
+              placeholder="Buscar por equipo, quién reportó, servicio o descripción..."
               aria-label="Buscar reportes"
             />
             {busqueda && (
@@ -142,6 +142,7 @@ function ReportesFalla() {
                 <th>Fecha</th>
                 <th>Equipo</th>
                 <th>Reportó</th>
+                <th>Servicio</th>
                 <th>Descripción</th>
                 <th>Estado</th>
                 <th>Acciones</th>
@@ -159,6 +160,7 @@ function ReportesFalla() {
                     {r.nombreCompleto}
                     <div style={{ fontSize: 11.5, color: '#9E9CBB' }}>Legajo {r.legajo} · usuario {r.usuario}</div>
                   </td>
+                  <td>{r.servicio || <span style={{ color: '#9E9CBB' }}>—</span>}</td>
                   <td style={{ maxWidth: 360, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{r.descripcion}</td>
                   <td>
                     <span style={chipEstado(r.estado)}>{r.estado}</span>
@@ -181,7 +183,7 @@ function ReportesFalla() {
                 </tr>
               ))}
               {!cargando && visibles.length === 0 && (
-                <tr><td colSpan="7" className="empty">
+                <tr><td colSpan="8" className="empty">
                   {busqueda.trim() ? 'No se encontraron reportes para tu búsqueda.'
                     : filtroEstado ? `No hay reportes en estado "${filtroEstado}".` : 'No hay reportes de falla.'}
                 </td></tr>

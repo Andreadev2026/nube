@@ -25,6 +25,11 @@ namespace NODUS.Models
         public string Legajo { get; set; } = string.Empty;
         public string Descripcion { get; set; } = string.Empty;
 
+        // Servicio desde el que se reporta. Obligatorio al crear (lo valida ReportesFallaService);
+        // nullable en la base solo por los reportes anteriores a este campo.
+        public int? IdServicio { get; set; }
+        public Servicio? Servicio { get; set; }
+
         public DateTime FechaReporte { get; set; }  // UTC
         public DateOnly FechaDia { get; set; }      // día en Argentina, lo calcula el servidor
         public string Estado { get; set; } = ESTADO_PENDIENTE;

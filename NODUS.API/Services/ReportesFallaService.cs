@@ -116,6 +116,10 @@ namespace NODUS.API.Services
                 return new(ResultadoReporte.Invalido, $"El legajo o matrícula no puede superar los {MAX_LEGAJO} caracteres.");
             if (descripcion.Length > MAX_DESCRIPCION)
                 return new(ResultadoReporte.Invalido, $"La descripción no puede superar los {MAX_DESCRIPCION} caracteres.");
+            if (input.ServicioId == null)
+                return new(ResultadoReporte.Invalido, "El servicio es obligatorio.");
+            if (!await _db.Servicios.AnyAsync(s => s.IdServicio == input.ServicioId))
+                return new(ResultadoReporte.Invalido, "El servicio seleccionado no existe.");
 
             // Primer nivel de la regla "un reporte por equipo por día"
             if (await ReportadoHoy(idEquipo))
@@ -129,6 +133,7 @@ namespace NODUS.API.Services
                 NombreCompleto = nombre,
                 Legajo = legajo,
                 Descripcion = descripcion,
+                IdServicio = input.ServicioId,
                 FechaReporte = ahora,
                 FechaDia = DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(ahora, ZonaHoraria.Argentina)),
                 Estado = ReporteFalla.ESTADO_PENDIENTE
@@ -171,6 +176,7 @@ namespace NODUS.API.Services
                     Legajo = r.Legajo,
                     Usuario = r.Usuario!.Nombre,
                     Descripcion = r.Descripcion,
+                    Servicio = r.Servicio!.Nombre,
                     FechaReporte = r.FechaReporte,
                     Estado = r.Estado,
                     IdOT = r.IdOT,
@@ -213,12 +219,17 @@ namespace NODUS.API.Services
             if (!await _db.Servicios.AnyAsync(s => s.IdServicio == idServicio))
                 return new(ResultadoReporte.Invalido, "El servicio seleccionado no existe.");
 
+            // Los reportes anteriores al campo servicio pueden no tenerlo
+            var servicioReporte = reporte.IdServicio == null ? null
+                : await _db.Servicios.Where(s => s.IdServicio == reporte.IdServicio).Select(s => s.Nombre).FirstOrDefaultAsync();
+
             var ot = new OrdenTrabajo
             {
                 FechaApertura = DateTime.UtcNow,
                 Tipo = "Correctiva",
-                Sintoma = $"Reporte de falla #{reporte.IdReporteFalla} — {reporte.NombreCompleto} " +
-                          $"(legajo/matrícula {reporte.Legajo}): {reporte.Descripcion}",
+                Sintoma = $"Reportado por {reporte.NombreCompleto} (Legajo {reporte.Legajo})" +
+                          (servicioReporte != null ? $" desde el servicio {servicioReporte}" : "") +
+                          $": {reporte.Descripcion}",
                 Estado = "Pendiente",
                 IdEquipo = equipo.IdEquipo,
                 IdServicio = idServicio.Value,

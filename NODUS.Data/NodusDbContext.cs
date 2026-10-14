@@ -336,6 +336,7 @@ namespace NODUS.Data
                 e.Property(x => x.Estado).HasColumnName("estado").HasMaxLength(30).IsRequired()
                     .HasDefaultValue(ReporteFalla.ESTADO_PENDIENTE);
                 e.Property(x => x.IdOT).HasColumnName("id_ot");
+                e.Property(x => x.IdServicio).HasColumnName("id_servicio");
                 // Un reporte por equipo por día: los descartados no cuentan (respaldo del chequeo del servicio
                 // para dos envíos simultáneos)
                 e.HasIndex(x => new { x.IdEquipo, x.FechaDia })
@@ -345,6 +346,7 @@ namespace NODUS.Data
                 e.HasIndex(x => x.Estado);
                 e.HasOne(x => x.Equipo).WithMany().HasForeignKey(x => x.IdEquipo).OnDelete(DeleteBehavior.Restrict);
                 e.HasOne(x => x.Usuario).WithMany().HasForeignKey(x => x.IdUsuario).OnDelete(DeleteBehavior.Restrict);
+                e.HasOne(x => x.Servicio).WithMany().HasForeignKey(x => x.IdServicio).OnDelete(DeleteBehavior.Restrict);
                 e.HasOne(x => x.OrdenTrabajo).WithMany().HasForeignKey(x => x.IdOT).OnDelete(DeleteBehavior.Restrict);
             });
 
