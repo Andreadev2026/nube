@@ -53,6 +53,7 @@ import Remitos from './pages/Remitos';
 import FichaEquipo from './pages/FichaEquipo';
 import FichaQR, { CLAVE_ULTIMO_QR } from './pages/FichaQR';
 import ReportesFalla from './pages/ReportesFalla';
+import InicioQR from './pages/InicioQR';
 import './App.css';
 
 /* Sidebar como componente separado para usar useLocation */
@@ -377,18 +378,7 @@ function RedirigirAQR({ onLogout }) {
   let ultimo = null;
   try { ultimo = sessionStorage.getItem(CLAVE_ULTIMO_QR); } catch { /* sin storage */ }
   if (ultimo) return <Navigate to={`/equipos/${ultimo}/qr`} replace />;
-  return (
-    <div style={{ maxWidth: 420, margin: '0 auto', padding: '60px 16px', textAlign: 'center' }}>
-      <div style={{ fontSize: 16, fontWeight: 700, color: '#1a1a1a', marginBottom: 8 }}>Escaneá el código QR del equipo</div>
-      <div style={{ fontSize: 13, color: '#6B7C8C', marginBottom: 20 }}>
-        Con el código QR pegado en el equipo vas a ver su ficha y vas a poder reportar una falla.
-      </div>
-      <button onClick={onLogout} style={{
-        background: 'white', color: '#6B7C8C', border: '1px solid #E5EDF3', padding: '10px 18px',
-        borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer'
-      }}>Cerrar sesión</button>
-    </div>
-  );
+  return <InicioQR onLogout={onLogout} />;
 }
 
 function App() {

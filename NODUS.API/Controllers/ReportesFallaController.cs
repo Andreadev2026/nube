@@ -8,7 +8,7 @@ using NODUS.API.Services;
 namespace NODUS.API.Controllers
 {
     // Ficha QR de solo lectura y reportes de falla.
-    // Las dos rutas de /api/equipos/{id} las usa cualquier usuario logueado (incluido Personal asistencial);
+    // Las rutas de /api/equipos (ficha QR, búsqueda y reporte) las usa cualquier usuario logueado (incluido Personal asistencial);
     // la gestión de los reportes es solo para Administrador, Jefe patrimonio y Jefe servicio.
     [ApiController]
     public class ReportesFallaController : ControllerBase
@@ -28,6 +28,19 @@ namespace NODUS.API.Controllers
             var ficha = await _reportes.ObtenerFichaQr(id);
             if (ficha == null) return NotFound("El equipo no existe.");
             return Ok(ficha);
+        }
+
+        // GET: api/equipos/buscar-qr?codigo=SN123 (número de serie o ID, para cuando no se puede escanear)
+        [HttpGet("api/equipos/buscar-qr")]
+        [Authorize(Policy = Politicas.CualquierUsuario)]
+        public async Task<IActionResult> BuscarParaQr([FromQuery] string? codigo)
+        {
+            if (string.IsNullOrWhiteSpace(codigo) || codigo.Length > 100)
+                return BadRequest("Ingresá un número de serie o ID válido.");
+
+            var idEquipo = await _reportes.BuscarIdEquipo(codigo);
+            if (idEquipo == null) return NotFound("No se encontró ningún equipo con ese número de serie o ID.");
+            return Ok(new { idEquipo });
         }
 
         // POST: api/equipos/5/reportes-falla

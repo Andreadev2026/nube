@@ -78,6 +78,26 @@ namespace NODUS.API.Services
             return ficha;
         }
 
+        // Búsqueda manual cuando no se puede escanear el QR: primero por número de serie exacto
+        // (sin distinguir mayúsculas), después por ID. Solo devuelve el ID para abrir la ficha QR.
+        public async Task<int?> BuscarIdEquipo(string codigo)
+        {
+            var texto = codigo.Trim();
+            if (texto.Length == 0) return null;
+
+            var serie = texto.ToLower();
+            var porSerie = await _db.Equipos
+                .Where(e => e.NroSerie.Trim().ToLower() == serie)
+                .OrderBy(e => e.IdEquipo)
+                .Select(e => (int?)e.IdEquipo)
+                .FirstOrDefaultAsync();
+            if (porSerie != null) return porSerie;
+
+            if (int.TryParse(texto, out var id) && await _db.Equipos.AnyAsync(e => e.IdEquipo == id))
+                return id;
+            return null;
+        }
+
         public async Task<RespuestaReporte> Crear(int idEquipo, int idUsuario, ReporteFallaInputDto input)
         {
             if (!await _db.Equipos.AnyAsync(e => e.IdEquipo == idEquipo))
