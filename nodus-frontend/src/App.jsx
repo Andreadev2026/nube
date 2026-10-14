@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, NavLink, Navigate, useLocation, useParams } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, NavLink, Navigate, useLocation, useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   IconStethoscope,
   IconMapPin,
@@ -25,6 +25,7 @@ import {
   IconAlertTriangle
 } from '@tabler/icons-react';
 import api, { configurarSesion } from './api';
+import { cargarSesion, guardarSesion, borrarSesion, destinoSeguro } from './sesion';
 import { puedeVerModulo, puedeHacer, ROL_PERSONAL_ASISTENCIAL } from './permisos';
 import {
   EVENTO_PRESTAMOS_ACTUALIZADOS, DIAS_AVISO, estaPorVencer,
@@ -373,93 +374,145 @@ function RedirigirFichaVieja() {
   return <Navigate to={`/equipos/${idEquipo}/qr`} replace />;
 }
 
-// Personal asistencial solo tiene la ficha QR: cualquier otra ruta vuelve al último equipo escaneado
+// Personal asistencial solo tiene la ficha QR: cualquier otra ruta vuelve al último equipo escaneado.
+// Con state.inicio (botón "Volver al inicio" de un equipo no encontrado) se muestra la pantalla de inicio.
 function RedirigirAQR({ onLogout }) {
+  const location = useLocation();
   let ultimo = null;
   try { ultimo = sessionStorage.getItem(CLAVE_ULTIMO_QR); } catch { /* sin storage */ }
-  if (ultimo) return <Navigate to={`/equipos/${ultimo}/qr`} replace />;
+  if (ultimo && !location.state?.inicio) return <Navigate to={`/equipos/${ultimo}/qr`} replace />;
   return <InicioQR onLogout={onLogout} />;
 }
 
+// Sin sesión: al login, guardando la ruta pedida (por ejemplo la ficha de un QR) para volver después
+function RedirigirALogin() {
+  const { pathname, search, hash } = useLocation();
+  const destino = destinoSeguro(pathname + search + hash);
+  const to = destino && destino !== '/' ? `/login?redirect=${encodeURIComponent(destino)}` : '/login';
+  return <Navigate to={to} replace />;
+}
+
+// Ya logueado en /login: al destino guardado (validado) o al inicio. Con replace, "atrás" no vuelve al login.
+function SalirDelLogin() {
+  const [params] = useSearchParams();
+  return <Navigate to={destinoSeguro(params.get('redirect')) || '/'} replace />;
+}
+
 function App() {
-  const [auth, setAuth] = useState(null);
+  return (
+    <BrowserRouter>
+      <AppRutas />
+    </BrowserRouter>
+  );
+}
+
+// El 401 de la API llama a la versión actual de handleExpira (configurarSesion guarda un callback fijo)
+const sesionVencida = { avisar: null };
+const alExpirarSesion = () => sesionVencida.avisar?.();
+
+function AppRutas() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  // La sesión guardada se restaura (y el token se configura) antes de montar las pantallas, que llaman a la API al cargar
+  const [auth, setAuth] = useState(() => {
+    const sesion = cargarSesion();
+    configurarSesion(sesion?.token ?? null, sesion ? alExpirarSesion : null);
+    return sesion;
+  });
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
-  const handleLogout = () => { configurarSesion(null); setAuth(null); };
-  // El token se configura antes de montar las pantallas, que llaman a la API al cargar
-  const handleLogin = (data) => { configurarSesion(data.token, handleLogout); setAuth(data); };
+  const cerrar = () => { borrarSesion(); configurarSesion(null); setAuth(null); };
+  // Cierre manual: al login sin destino
+  const handleLogout = () => {
+    cerrar();
+    try { sessionStorage.removeItem(CLAVE_ULTIMO_QR); } catch { /* sin storage */ }
+    navigate('/login', { replace: true });
+  };
+  // Token vencido o inválido: RedirigirALogin manda al login conservando la pantalla actual como destino
+  const handleExpira = () => cerrar();
+  useEffect(() => { sesionVencida.avisar = handleExpira; });
 
-  // Sin sesión se muestra el login sin cambiar la URL: al ingresar, el router arranca en la
-  // misma ruta (por ejemplo /equipos/5/qr al escanear un QR)
+  const handleLogin = (data) => {
+    guardarSesion(data);
+    configurarSesion(data.token, alExpirarSesion);
+    setAuth(data);
+  };
+
   if (!auth) {
-    return <Login onLogin={handleLogin} />;
+    return (
+      <Routes>
+        <Route path="/login" element={<Login onLogin={handleLogin} />} />
+        <Route path="*" element={<RedirigirALogin />} />
+      </Routes>
+    );
+  }
+
+  // El login no decide adónde ir: lo hace SalirDelLogin, después de leer el destino
+  if (location.pathname === '/login') {
+    return <SalirDelLogin />;
   }
 
   if (auth.usuario.rol === ROL_PERSONAL_ASISTENCIAL) {
     return (
-      <BrowserRouter>
-        <main style={{ minHeight: '100vh', background: '#F4F7FA' }}>
-          <Routes>
-            <Route path="/equipos/:idEquipo/qr" element={<FichaQR auth={auth} onLogout={handleLogout} />} />
-            {/* QRs impresos antes de la ficha QR: apuntan a /ficha/:id */}
-            <Route path="/ficha/:idEquipo" element={<RedirigirFichaVieja />} />
-            <Route path="*" element={<RedirigirAQR onLogout={handleLogout} />} />
-          </Routes>
-        </main>
-      </BrowserRouter>
+      <main style={{ minHeight: '100vh', background: '#F4F7FA' }}>
+        <Routes>
+          <Route path="/equipos/:idEquipo/qr" element={<FichaQR auth={auth} onLogout={handleLogout} />} />
+          {/* QRs impresos antes de la ficha QR: apuntan a /ficha/:id */}
+          <Route path="/ficha/:idEquipo" element={<RedirigirFichaVieja />} />
+          <Route path="*" element={<RedirigirAQR onLogout={handleLogout} />} />
+        </Routes>
+      </main>
     );
   }
 
   return (
-    <BrowserRouter>
-      <div className="app">
-        <button
-          className="sn-hamburger no-print"
-          onClick={() => setMobileNavOpen(o => !o)}
-          aria-label={mobileNavOpen ? 'Cerrar menú' : 'Abrir menú'}
-        >
-          {mobileNavOpen ? <IconX size={22} /> : <IconMenu2 size={22} />}
-        </button>
-        {mobileNavOpen && (
-          <div className="sn-overlay no-print" onClick={() => setMobileNavOpen(false)} />
-        )}
-        <Sidebar
-          auth={auth}
-          onLogout={handleLogout}
-          mobileOpen={mobileNavOpen}
-          onNavigate={() => setMobileNavOpen(false)}
-        />
-        <main className="content">
-          <Routes>
-            <Route path="/" element={<Bienvenida auth={auth} />} />
-            <Route path="/marcas" element={<Marcas />} />
-            <Route path="/sectores" element={<Sectores />} />
-            <Route path="/servicios" element={<Servicios />} />
-            <Route path="/activos" element={<RutaProtegida auth={auth} modulo="patrimonial"><Activos /></RutaProtegida>} />
-            <Route path="/ficha/:idEquipo" element={<FichaEquipo auth={auth} />} />
-            <Route path="/equipos/:idEquipo/qr" element={<FichaQR auth={auth} onLogout={handleLogout} />} />
-            <Route path="/reportesfalla" element={<RutaProtegida auth={auth} accion="gestionar_reportes_falla"><ReportesFalla /></RutaProtegida>} />
-            <Route path="/equipos" element={<Navigate to="/activos" />} />
-            <Route path="/ubicaciones" element={<RutaProtegida auth={auth} modulo="patrimonial"><Ubicaciones /></RutaProtegida>} />
-            <Route path="/insumos" element={<RutaProtegida auth={auth} modulo="insumos"><Insumos /></RutaProtegida>} />
-            <Route path="/ordenestrabajo" element={<RutaProtegida auth={auth} modulo="mantenimiento"><OrdenesTrabajo /></RutaProtegida>} />
-            <Route path="/intervenciones" element={<RutaProtegida auth={auth} modulo="mantenimiento"><Intervenciones /></RutaProtegida>} />
-            <Route path="/usosinsumo" element={<RutaProtegida auth={auth} modulo="insumos"><UsosInsumo /></RutaProtegida>} />
-            <Route path="/alertas" element={<Alertas auth={auth} />} />
-            <Route path="/bajaspatrimoniales" element={<RutaProtegida auth={auth} modulo="patrimonial"><BajasPatrimoniales /></RutaProtegida>} />
-            <Route path="/hojasdevida" element={<RutaProtegida auth={auth} modulo="mantenimiento"><HojasDeVida /></RutaProtegida>} />
-            <Route path="/usuarios" element={<RutaProtegida auth={auth} modulo="administracion"><Usuarios /></RutaProtegida>} />
-            <Route path="/prestamos" element={<RutaProtegida auth={auth} modulo="prestamos"><Prestamos auth={auth} /></RutaProtegida>} />
-            <Route path="/hospitalesexternos" element={<RutaProtegida auth={auth} modulo="prestamos"><HospitalesExternos /></RutaProtegida>} />
-            <Route path="/mapaprestamos" element={<RutaProtegida auth={auth} modulo="prestamos"><MapaPrestamos /></RutaProtegida>} />
-            <Route path="/remitos" element={<RutaProtegida auth={auth} modulo="prestamos"><Remitos /></RutaProtegida>} />
-            <Route path="*" element={<Navigate to="/" />} />
-            <Route path="/reportes" element={<RutaProtegida auth={auth} modulo="reportes"><Reportes /></RutaProtegida>} />
-            <Route path="/reportes/listados" element={<RutaProtegida auth={auth} modulo="reportes"><Reportes /></RutaProtegida>} />
-          </Routes>
-        </main>
-      </div>
-    </BrowserRouter>
+    <div className="app">
+      <button
+        className="sn-hamburger no-print"
+        onClick={() => setMobileNavOpen(o => !o)}
+        aria-label={mobileNavOpen ? 'Cerrar menú' : 'Abrir menú'}
+      >
+        {mobileNavOpen ? <IconX size={22} /> : <IconMenu2 size={22} />}
+      </button>
+      {mobileNavOpen && (
+        <div className="sn-overlay no-print" onClick={() => setMobileNavOpen(false)} />
+      )}
+      <Sidebar
+        auth={auth}
+        onLogout={handleLogout}
+        mobileOpen={mobileNavOpen}
+        onNavigate={() => setMobileNavOpen(false)}
+      />
+      <main className="content">
+        <Routes>
+          <Route path="/" element={<Bienvenida auth={auth} />} />
+          <Route path="/marcas" element={<Marcas />} />
+          <Route path="/sectores" element={<Sectores />} />
+          <Route path="/servicios" element={<Servicios />} />
+          <Route path="/activos" element={<RutaProtegida auth={auth} modulo="patrimonial"><Activos /></RutaProtegida>} />
+          <Route path="/ficha/:idEquipo" element={<FichaEquipo auth={auth} />} />
+          <Route path="/equipos/:idEquipo/qr" element={<FichaQR auth={auth} onLogout={handleLogout} />} />
+          <Route path="/reportesfalla" element={<RutaProtegida auth={auth} accion="gestionar_reportes_falla"><ReportesFalla /></RutaProtegida>} />
+          <Route path="/equipos" element={<Navigate to="/activos" />} />
+          <Route path="/ubicaciones" element={<RutaProtegida auth={auth} modulo="patrimonial"><Ubicaciones /></RutaProtegida>} />
+          <Route path="/insumos" element={<RutaProtegida auth={auth} modulo="insumos"><Insumos /></RutaProtegida>} />
+          <Route path="/ordenestrabajo" element={<RutaProtegida auth={auth} modulo="mantenimiento"><OrdenesTrabajo /></RutaProtegida>} />
+          <Route path="/intervenciones" element={<RutaProtegida auth={auth} modulo="mantenimiento"><Intervenciones /></RutaProtegida>} />
+          <Route path="/usosinsumo" element={<RutaProtegida auth={auth} modulo="insumos"><UsosInsumo /></RutaProtegida>} />
+          <Route path="/alertas" element={<Alertas auth={auth} />} />
+          <Route path="/bajaspatrimoniales" element={<RutaProtegida auth={auth} modulo="patrimonial"><BajasPatrimoniales /></RutaProtegida>} />
+          <Route path="/hojasdevida" element={<RutaProtegida auth={auth} modulo="mantenimiento"><HojasDeVida /></RutaProtegida>} />
+          <Route path="/usuarios" element={<RutaProtegida auth={auth} modulo="administracion"><Usuarios /></RutaProtegida>} />
+          <Route path="/prestamos" element={<RutaProtegida auth={auth} modulo="prestamos"><Prestamos auth={auth} /></RutaProtegida>} />
+          <Route path="/hospitalesexternos" element={<RutaProtegida auth={auth} modulo="prestamos"><HospitalesExternos /></RutaProtegida>} />
+          <Route path="/mapaprestamos" element={<RutaProtegida auth={auth} modulo="prestamos"><MapaPrestamos /></RutaProtegida>} />
+          <Route path="/remitos" element={<RutaProtegida auth={auth} modulo="prestamos"><Remitos /></RutaProtegida>} />
+          <Route path="*" element={<Navigate to="/" />} />
+          <Route path="/reportes" element={<RutaProtegida auth={auth} modulo="reportes"><Reportes /></RutaProtegida>} />
+          <Route path="/reportes/listados" element={<RutaProtegida auth={auth} modulo="reportes"><Reportes /></RutaProtegida>} />
+        </Routes>
+      </main>
+    </div>
   );
 }
 

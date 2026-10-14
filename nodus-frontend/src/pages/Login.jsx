@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import api from '../api';
+import { destinoSeguro, esDestinoQR } from '../sesion';
 import '../App.css';
 
 function Login({ onLogin }) {
@@ -11,6 +13,9 @@ function Login({ onLogin }) {
   const [mostrarRecuperar, setMostrarRecuperar] = useState(false);
   const [emailRecuperar, setEmailRecuperar] = useState('');
   const [mensajeRecuperar, setMensajeRecuperar] = useState('');
+  // Se llegó por el QR de un equipo: después del login, App vuelve a su ficha (ver SalirDelLogin)
+  const [params] = useSearchParams();
+  const vieneDeQR = esDestinoQR(destinoSeguro(params.get('redirect')));
 
   useEffect(() => {
     const saved = localStorage.getItem('nodus_usuario');
@@ -87,6 +92,14 @@ function Login({ onLogin }) {
       <div className="login-card">
         <img src="/logonodus.jpg" alt="NODUS" className="login-logo" />
         <p className="login-subtitle">Sistema de Control Patrimonial Hospitalario</p>
+        {vieneDeQR && (
+          <div role="status" style={{
+            background: '#E6F1FB', color: '#0C447C', border: '1px solid #C7DDF2', borderRadius: 10,
+            padding: '10px 12px', fontSize: 13.5, fontWeight: 600, lineHeight: 1.4, textAlign: 'center', marginBottom: 16
+          }}>
+            Iniciá sesión para ver la información del equipo
+          </div>
+        )}
         <form onSubmit={handleLogin}>
           <div className="form-group">
             <label>Usuario</label>

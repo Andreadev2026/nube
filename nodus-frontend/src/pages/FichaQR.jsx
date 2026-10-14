@@ -12,6 +12,7 @@ export const CLAVE_ULTIMO_QR = 'nodus_ultimo_qr';
 const MAX = { nombreCompleto: 100, legajo: 30, descripcion: 1000 };
 const MSJ_DUPLICADO = 'Este equipo ya tiene una falla reportada hoy. Mantenimiento ya fue notificado.';
 const FORM_VACIO = { nombreCompleto: '', legajo: '', descripcion: '' };
+const NO_ENCONTRADO = 'no_encontrado';
 
 // Con key por equipo, el estado (formulario, aviso) arranca de cero al pasar a otro QR
 function FichaQR(props) {
@@ -36,20 +37,19 @@ function FichaQREquipo({ idEquipo, auth, onLogout }) {
   const puedeReportar = puedeHacer(rol, 'reportar_falla');
 
   useEffect(() => {
-    // Para volver a esta ficha si Personal asistencial navega a otra ruta
-    try { sessionStorage.setItem(CLAVE_ULTIMO_QR, idEquipo); } catch { /* sin storage: no pasa nada */ }
-
     let cancelado = false;
     api.get(`/equipos/${idEquipo}/ficha-qr`)
       .then(r => {
         if (cancelado) return;
+        // Para volver a esta ficha si Personal asistencial navega a otra ruta (solo si el equipo existe)
+        try { sessionStorage.setItem(CLAVE_ULTIMO_QR, idEquipo); } catch { /* sin storage: no pasa nada */ }
         setFicha(r.data);
         if (r.data.reportadoHoy) setAviso('cargado');
       })
       .catch(err => {
         if (cancelado) return;
         setError(err.response?.status === 404
-          ? 'No se encontró el equipo. Verificá que el código QR sea correcto.'
+          ? NO_ENCONTRADO
           : 'No se pudo cargar la ficha del equipo. Intentá de nuevo.');
       })
       .finally(() => { if (!cancelado) setCargando(false); });
@@ -118,6 +118,24 @@ function FichaQREquipo({ idEquipo, auth, onLogout }) {
       <div style={contenedor}>
         {barraSuperior}
         <div style={{ textAlign: 'center', padding: 60, color: '#9E9CBB' }}>Cargando ficha del equipo...</div>
+      </div>
+    );
+  }
+
+  if (error === NO_ENCONTRADO) {
+    return (
+      <div style={contenedor}>
+        {barraSuperior}
+        <div style={{ ...cardStyle, textAlign: 'center', marginTop: 24, padding: '28px 20px' }}>
+          <div style={{ fontSize: 17, fontWeight: 700, color: '#712B13', marginBottom: 8 }}>Equipo no encontrado</div>
+          <div style={{ fontSize: 13.5, color: '#6B7C8C', lineHeight: 1.5, marginBottom: 20 }}>
+            El código QR no corresponde a ningún equipo registrado. Verificá que sea el QR pegado en el equipo.
+          </div>
+          {/* state.inicio: Personal asistencial ve su pantalla de inicio y no vuelve al último QR */}
+          <button onClick={() => navigate('/', { replace: true, state: { inicio: true } })} style={btnSave}>
+            Volver al inicio
+          </button>
+        </div>
       </div>
     );
   }
