@@ -183,18 +183,6 @@ function FichaQREquipo({ idEquipo, auth, onLogout }) {
         <FilaDato label="Alertas registradas" valor={ficha.alertas?.length ? ficha.alertas.join(', ') : 'Ninguna'} ultima />
       </div>
 
-      <div style={cardStyle}>
-        <div style={tituloCard}>Componentes registrados</div>
-        {ficha.componentes?.length > 0 ? ficha.componentes.map((c, idx) => (
-          <div key={idx} style={{
-            padding: '8px 0', borderBottom: idx < ficha.componentes.length - 1 ? '1px solid #F1F4F7' : 'none',
-            fontSize: 13, color: '#2D3748'
-          }}>{c}</div>
-        )) : (
-          <div style={{ fontSize: 13, color: '#9E9CBB' }}>Sin componentes registrados</div>
-        )}
-      </div>
-
       {puedeReportar && (
         <div style={cardStyle}>
           <div style={{ ...tituloCard, marginBottom: 2, letterSpacing: 0.4 }}>REPORTAR FALLA</div>
