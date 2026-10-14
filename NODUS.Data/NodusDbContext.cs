@@ -28,6 +28,7 @@ namespace NODUS.Data
         public DbSet<PrestamoComponente> PrestamoComponentes { get; set; }
         public DbSet<RemitoContador> RemitoContadores { get; set; }
         public DbSet<ProrrogaPrestamo> ProrrogasPrestamo { get; set; }
+        public DbSet<ReporteFalla> ReportesFalla { get; set; }
 
         public NodusDbContext(DbContextOptions<NodusDbContext> options) : base(options) { }
 
@@ -318,6 +319,33 @@ namespace NODUS.Data
                 e.Property(x => x.IdUsuario).HasColumnName("id_usuario");
                 e.HasOne(x => x.Equipo).WithMany(eq => eq.Alertas).HasForeignKey(x => x.IdEquipo).OnDelete(DeleteBehavior.Restrict);
                 e.HasOne(x => x.Usuario).WithMany().HasForeignKey(x => x.IdUsuario).OnDelete(DeleteBehavior.Restrict);
+            });
+
+            // ── REPORTE_FALLA ──
+            modelBuilder.Entity<ReporteFalla>(e =>
+            {
+                e.ToTable("reporte_falla"); e.HasKey(x => x.IdReporteFalla);
+                e.Property(x => x.IdReporteFalla).HasColumnName("id_reporte_falla");
+                e.Property(x => x.IdEquipo).HasColumnName("id_equipo");
+                e.Property(x => x.IdUsuario).HasColumnName("id_usuario");
+                e.Property(x => x.NombreCompleto).HasColumnName("nombre_completo").HasMaxLength(100).IsRequired();
+                e.Property(x => x.Legajo).HasColumnName("legajo").HasMaxLength(30).IsRequired();
+                e.Property(x => x.Descripcion).HasColumnName("descripcion").HasMaxLength(1000).IsRequired();
+                e.Property(x => x.FechaReporte).HasColumnName("fecha_reporte").IsRequired();
+                e.Property(x => x.FechaDia).HasColumnName("fecha_dia").IsRequired();
+                e.Property(x => x.Estado).HasColumnName("estado").HasMaxLength(30).IsRequired()
+                    .HasDefaultValue(ReporteFalla.ESTADO_PENDIENTE);
+                e.Property(x => x.IdOT).HasColumnName("id_ot");
+                // Un reporte por equipo por día: los descartados no cuentan (respaldo del chequeo del servicio
+                // para dos envíos simultáneos)
+                e.HasIndex(x => new { x.IdEquipo, x.FechaDia })
+                    .IsUnique()
+                    .HasFilter("estado <> 'Descartado'")
+                    .HasDatabaseName(ReporteFalla.INDICE_UNO_POR_DIA);
+                e.HasIndex(x => x.Estado);
+                e.HasOne(x => x.Equipo).WithMany().HasForeignKey(x => x.IdEquipo).OnDelete(DeleteBehavior.Restrict);
+                e.HasOne(x => x.Usuario).WithMany().HasForeignKey(x => x.IdUsuario).OnDelete(DeleteBehavior.Restrict);
+                e.HasOne(x => x.OrdenTrabajo).WithMany().HasForeignKey(x => x.IdOT).OnDelete(DeleteBehavior.Restrict);
             });
 
             // ── SEED DATA ──

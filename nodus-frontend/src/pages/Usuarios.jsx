@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import api from '../api';
 import { useToast, mensajeDeError } from '../components/Toast';
 
-const ROLES = ['Técnico biomédico', 'Jefe patrimonio', 'Jefe servicio', 'Auditor ANMAT', 'Administrador', 'Médico', 'Residente', 'Enfermero'];
+const ROLES = ['Técnico biomédico', 'Jefe patrimonio', 'Jefe servicio', 'Auditor ANMAT', 'Administrador', 'Médico', 'Residente', 'Enfermero', 'Personal asistencial'];
 
 function Usuarios() {
   const toast = useToast();
@@ -118,6 +118,7 @@ function Usuarios() {
       'Médico':            { bg: '#E6F1FB', fg: '#0C447C' },
       'Residente':         { bg: '#F0F6FA', fg: '#2C7DA0' },
       'Enfermero':         { bg: '#FFF3E0', fg: '#8A5A16' },
+      'Personal asistencial': { bg: '#EEF3FB', fg: '#2F4A6D' },
     };
     return map[r] || { bg: '#F1EFE8', fg: '#444441' };
   };

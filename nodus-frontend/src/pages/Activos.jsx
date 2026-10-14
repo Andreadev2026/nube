@@ -1185,7 +1185,7 @@ function Activos() {
                 <div style={{ fontSize: 13, color: '#6B7C8C', marginTop: 2 }}>S/N {modalQrEquipo.nroSerie}</div>
               </div>
               <img
-                src={`https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(`${window.location.origin}/ficha/${modalQrEquipo.idEquipo}`)}`}
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(`${window.location.origin}/equipos/${modalQrEquipo.idEquipo}/qr`)}`}
                 alt={`Codigo QR de ${modalQrEquipo.modelo}`}
                 style={{ width: 260, height: 260, margin: '0 auto' }}
               />

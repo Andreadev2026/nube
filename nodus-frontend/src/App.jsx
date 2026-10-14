@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, NavLink, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, NavLink, Navigate, useLocation, useParams } from 'react-router-dom';
 import {
   IconStethoscope,
   IconMapPin,
@@ -21,10 +21,11 @@ import {
   IconBuildingHospital,
   IconMap2,
   IconMenu2,
-  IconX
+  IconX,
+  IconAlertTriangle
 } from '@tabler/icons-react';
-import api from './api';
-import { puedeVerModulo } from './permisos';
+import api, { configurarSesion } from './api';
+import { puedeVerModulo, puedeHacer, ROL_PERSONAL_ASISTENCIAL } from './permisos';
 import {
   EVENTO_PRESTAMOS_ACTUALIZADOS, DIAS_AVISO, estaPorVencer,
   EVENTO_EQUIPOS_ACTUALIZADOS, DIAS_AVISO_GARANTIA, garantiaPorVencer
@@ -50,6 +51,8 @@ import HospitalesExternos from './pages/HospitalesExternos';
 import MapaPrestamos from './pages/MapaPrestamos';
 import Remitos from './pages/Remitos';
 import FichaEquipo from './pages/FichaEquipo';
+import FichaQR, { CLAVE_ULTIMO_QR } from './pages/FichaQR';
+import ReportesFalla from './pages/ReportesFalla';
 import './App.css';
 
 /* Sidebar como componente separado para usar useLocation */
@@ -66,6 +69,7 @@ function Sidebar({ auth, onLogout, mobileOpen, onNavigate }) {
     '/ordenestrabajo': 'mantenimiento',
     '/intervenciones': 'mantenimiento',
     '/hojasdevida': 'mantenimiento',
+    '/reportesfalla': 'mantenimiento',
     '/insumos': 'insumos',
     '/usosinsumo': 'insumos',
     '/reportes': 'reportes',
@@ -219,6 +223,12 @@ function Sidebar({ auth, onLogout, mobileOpen, onNavigate }) {
                   <IconFileText size={16} stroke={2} />
                   <span>Hojas de vida</span>
                 </NavLink>
+                {puedeHacer(rol, 'gestionar_reportes_falla') && (
+                  <NavLink to="/reportesfalla" className="sn-item">
+                    <IconAlertTriangle size={16} stroke={2} />
+                    <span>Reportes de falla</span>
+                  </NavLink>
+                )}
               </div>
             )}
           </>
@@ -348,23 +358,66 @@ function Sidebar({ auth, onLogout, mobileOpen, onNavigate }) {
   );
 }
 
-function RutaProtegida({ auth, modulo, children }) {
+function RutaProtegida({ auth, modulo, accion, children }) {
   const rol = auth?.usuario?.rol;
-  if (!puedeVerModulo(rol, modulo)) {
+  const permitido = accion ? puedeHacer(rol, accion) : puedeVerModulo(rol, modulo);
+  if (!permitido) {
     return <Navigate to="/" replace />;
   }
   return children;
+}
+
+function RedirigirFichaVieja() {
+  const { idEquipo } = useParams();
+  return <Navigate to={`/equipos/${idEquipo}/qr`} replace />;
+}
+
+// Personal asistencial solo tiene la ficha QR: cualquier otra ruta vuelve al último equipo escaneado
+function RedirigirAQR({ onLogout }) {
+  let ultimo = null;
+  try { ultimo = sessionStorage.getItem(CLAVE_ULTIMO_QR); } catch { /* sin storage */ }
+  if (ultimo) return <Navigate to={`/equipos/${ultimo}/qr`} replace />;
+  return (
+    <div style={{ maxWidth: 420, margin: '0 auto', padding: '60px 16px', textAlign: 'center' }}>
+      <div style={{ fontSize: 16, fontWeight: 700, color: '#1a1a1a', marginBottom: 8 }}>Escaneá el código QR del equipo</div>
+      <div style={{ fontSize: 13, color: '#6B7C8C', marginBottom: 20 }}>
+        Con el código QR pegado en el equipo vas a ver su ficha y vas a poder reportar una falla.
+      </div>
+      <button onClick={onLogout} style={{
+        background: 'white', color: '#6B7C8C', border: '1px solid #E5EDF3', padding: '10px 18px',
+        borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer'
+      }}>Cerrar sesión</button>
+    </div>
+  );
 }
 
 function App() {
   const [auth, setAuth] = useState(null);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
-  const handleLogin = (data) => { setAuth(data); };
-  const handleLogout = () => { setAuth(null); };
+  const handleLogout = () => { configurarSesion(null); setAuth(null); };
+  // El token se configura antes de montar las pantallas, que llaman a la API al cargar
+  const handleLogin = (data) => { configurarSesion(data.token, handleLogout); setAuth(data); };
 
+  // Sin sesión se muestra el login sin cambiar la URL: al ingresar, el router arranca en la
+  // misma ruta (por ejemplo /equipos/5/qr al escanear un QR)
   if (!auth) {
     return <Login onLogin={handleLogin} />;
+  }
+
+  if (auth.usuario.rol === ROL_PERSONAL_ASISTENCIAL) {
+    return (
+      <BrowserRouter>
+        <main style={{ minHeight: '100vh', background: '#F4F7FA' }}>
+          <Routes>
+            <Route path="/equipos/:idEquipo/qr" element={<FichaQR auth={auth} onLogout={handleLogout} />} />
+            {/* QRs impresos antes de la ficha QR: apuntan a /ficha/:id */}
+            <Route path="/ficha/:idEquipo" element={<RedirigirFichaVieja />} />
+            <Route path="*" element={<RedirigirAQR onLogout={handleLogout} />} />
+          </Routes>
+        </main>
+      </BrowserRouter>
+    );
   }
 
   return (
@@ -394,6 +447,8 @@ function App() {
             <Route path="/servicios" element={<Servicios />} />
             <Route path="/activos" element={<RutaProtegida auth={auth} modulo="patrimonial"><Activos /></RutaProtegida>} />
             <Route path="/ficha/:idEquipo" element={<FichaEquipo auth={auth} />} />
+            <Route path="/equipos/:idEquipo/qr" element={<FichaQR auth={auth} onLogout={handleLogout} />} />
+            <Route path="/reportesfalla" element={<RutaProtegida auth={auth} accion="gestionar_reportes_falla"><ReportesFalla /></RutaProtegida>} />
             <Route path="/equipos" element={<Navigate to="/activos" />} />
             <Route path="/ubicaciones" element={<RutaProtegida auth={auth} modulo="patrimonial"><Ubicaciones /></RutaProtegida>} />
             <Route path="/insumos" element={<RutaProtegida auth={auth} modulo="insumos"><Insumos /></RutaProtegida>} />

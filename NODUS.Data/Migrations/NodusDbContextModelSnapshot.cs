@@ -803,6 +803,77 @@ namespace NODUS.Data.Migrations
                     b.ToTable("remito_contador", (string)null);
                 });
 
+            modelBuilder.Entity("NODUS.Models.ReporteFalla", b =>
+                {
+                    b.Property<int>("IdReporteFalla")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id_reporte_falla");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("IdReporteFalla"));
+
+                    b.Property<string>("Descripcion")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("descripcion");
+
+                    b.Property<string>("Estado")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasDefaultValue("Pendiente")
+                        .HasColumnName("estado");
+
+                    b.Property<DateOnly>("FechaDia")
+                        .HasColumnType("date")
+                        .HasColumnName("fecha_dia");
+
+                    b.Property<DateTime>("FechaReporte")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("fecha_reporte");
+
+                    b.Property<int>("IdEquipo")
+                        .HasColumnType("integer")
+                        .HasColumnName("id_equipo");
+
+                    b.Property<int?>("IdOT")
+                        .HasColumnType("integer")
+                        .HasColumnName("id_ot");
+
+                    b.Property<int>("IdUsuario")
+                        .HasColumnType("integer")
+                        .HasColumnName("id_usuario");
+
+                    b.Property<string>("Legajo")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("legajo");
+
+                    b.Property<string>("NombreCompleto")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("nombre_completo");
+
+                    b.HasKey("IdReporteFalla");
+
+                    b.HasIndex("Estado");
+
+                    b.HasIndex("IdOT");
+
+                    b.HasIndex("IdUsuario");
+
+                    b.HasIndex("IdEquipo", "FechaDia")
+                        .IsUnique()
+                        .HasDatabaseName("ux_reporte_falla_equipo_dia")
+                        .HasFilter("estado <> 'Descartado'");
+
+                    b.ToTable("reporte_falla", (string)null);
+                });
+
             modelBuilder.Entity("NODUS.Models.Sector", b =>
                 {
                     b.Property<int>("IdSector")
@@ -1286,6 +1357,32 @@ namespace NODUS.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Prestamo");
+
+                    b.Navigation("Usuario");
+                });
+
+            modelBuilder.Entity("NODUS.Models.ReporteFalla", b =>
+                {
+                    b.HasOne("NODUS.Models.Equipo", "Equipo")
+                        .WithMany()
+                        .HasForeignKey("IdEquipo")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("NODUS.Models.OrdenTrabajo", "OrdenTrabajo")
+                        .WithMany()
+                        .HasForeignKey("IdOT")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("NODUS.Models.Usuario", "Usuario")
+                        .WithMany()
+                        .HasForeignKey("IdUsuario")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Equipo");
+
+                    b.Navigation("OrdenTrabajo");
 
                     b.Navigation("Usuario");
                 });

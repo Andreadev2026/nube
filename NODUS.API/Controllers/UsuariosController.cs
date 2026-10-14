@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using NODUS.API.Services;
 using NODUS.Data;
 using NODUS.Models;
 
@@ -51,6 +52,8 @@ namespace NODUS.API.Controllers
                 return BadRequest("El email es obligatorio.");
             if (string.IsNullOrWhiteSpace(request.Rol))
                 return BadRequest("El rol es obligatorio.");
+            if (!Roles.Todos.Contains(request.Rol))
+                return BadRequest("El rol seleccionado no es válido.");
             if (string.IsNullOrWhiteSpace(request.Password))
                 return BadRequest("La contraseña es obligatoria.");
 
@@ -77,6 +80,9 @@ namespace NODUS.API.Controllers
         {
             var usuario = await _db.Usuarios.FindAsync(id);
             if (usuario == null) return NotFound();
+
+            if (!string.IsNullOrWhiteSpace(request.Rol) && !Roles.Todos.Contains(request.Rol))
+                return BadRequest("El rol seleccionado no es válido.");
 
             if (!string.IsNullOrWhiteSpace(request.Nombre)) usuario.Nombre = request.Nombre;
             if (!string.IsNullOrWhiteSpace(request.Email)) usuario.Email = request.Email;

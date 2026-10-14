@@ -1,5 +1,8 @@
+using System.Security.Claims;
 using System.Text;
+using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using NODUS.API.Services;
@@ -48,6 +51,7 @@ QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
 builder.Services.AddSingleton<AlmacenamientoService>();
 builder.Services.AddScoped<RemitoService>();
 builder.Services.AddScoped<EstadosOTService>();
+builder.Services.AddScoped<ReportesFallaService>();
 
 // Nominatim exige un User-Agent que identifique a la aplicación
 builder.Services.AddHttpClient<GeocodingService>(client =>
@@ -73,6 +77,39 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                 Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!))
         };
     });
+
+builder.Services.AddAuthorization(options =>
+{
+    // Toda la API exige un usuario interno salvo los endpoints con [AllowAnonymous] o con su propio [Authorize].
+    // Así Personal asistencial no llega a ningún módulo aunque llame a la API a mano.
+    var usuarioInterno = new AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .RequireAssertion(ctx => !ctx.User.IsInRole(Roles.PersonalAsistencial))
+        .Build();
+    options.AddPolicy(Politicas.UsuarioInterno, usuarioInterno);
+    options.FallbackPolicy = usuarioInterno;
+
+    // Ficha QR y reporte de fallas: cualquier usuario autenticado, incluido Personal asistencial
+    options.AddPolicy(Politicas.CualquierUsuario, p => p.RequireAuthenticatedUser());
+});
+
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.OnRejected = (ctx, _) =>
+        new ValueTask(ctx.HttpContext.Response.WriteAsync("Enviaste demasiados reportes. Esperá unos minutos y volvé a intentar."));
+
+    // 10 reportes de falla cada 10 minutos por usuario (el id sale del token)
+    options.AddPolicy(LimitesTasa.ReportesFalla, http =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            http.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? http.Connection.RemoteIpAddress?.ToString() ?? "anonimo",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 10,
+                Window = TimeSpan.FromMinutes(10),
+                QueueLimit = 0
+            }));
+});
 
 builder.Services.AddCors(options =>
 {
@@ -121,7 +158,21 @@ if (app.Environment.IsDevelopment())
 app.UseCors("ReactApp");
 app.UseAuthentication();
 app.UseAuthorization();
-app.MapControllers();
+app.UseRateLimiter();
+
+// Los PDFs y escaneos de remitos se abren con un link directo (<a href>), que no lleva el token:
+// quedan accesibles sin sesión, como estaban antes de exigir autenticación en la API.
+string[] documentosSinToken =
+{
+    "api/Prestamos/{id}/remito", "api/Prestamos/{id}/remito-devolucion",
+    "api/Remitos/{id}/firma-salida", "api/Remitos/{id}/firma-devolucion"
+};
+app.MapControllers().Add(endpoint =>
+{
+    if (endpoint is RouteEndpointBuilder ruta
+        && documentosSinToken.Contains(ruta.RoutePattern.RawText, StringComparer.OrdinalIgnoreCase))
+        endpoint.Metadata.Add(new AllowAnonymousAttribute());
+});
 app.Run();
 
 static string ConvertirDatabaseUrl(string databaseUrl)
