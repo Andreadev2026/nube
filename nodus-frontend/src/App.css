@@ -521,3 +521,42 @@ tbody td { padding: 9px 12px; color: #2D3748; }
     white-space: nowrap;
   }
 }
+
+/* ── REPORTES DE FALLA: buscador y filtros ──
+   Mismo look que los buscadores con lupa de Activos (borde #E5EDF3, fondo #FAFBFC, lupa a la izquierda) */
+.rf-filtros { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; padding: 16px; }
+.rf-busqueda { position: relative; flex: 1 1 320px; min-width: 0; }
+.rf-lupa {
+  position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+  color: #9E9CBB; font-size: 14px; pointer-events: none;
+}
+.rf-busqueda input, .rf-select {
+  width: 100%; padding: 10px 12px; border: 1.5px solid #E5EDF3; border-radius: 8px;
+  font-size: 13px; background: #FAFBFC; color: #2D3748; outline: none;
+  font-family: inherit; transition: all 0.15s;
+}
+.rf-busqueda input { padding-left: 36px; padding-right: 34px; }
+.rf-busqueda input:focus, .rf-select:focus {
+  border-color: #2C7DA0; background: #FFFFFF; box-shadow: 0 0 0 3px rgba(44, 125, 160, 0.12);
+}
+.rf-limpiar {
+  position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+  background: transparent; border: none; color: #9E9CBB; font-size: 18px; line-height: 1;
+  cursor: pointer; padding: 4px 8px; border-radius: 6px;
+}
+.rf-limpiar:hover { color: #2C7DA0; background: #F0F6FA; }
+.rf-acciones { display: flex; gap: 8px; align-items: center; }
+.rf-select {
+  width: 210px; cursor: pointer; padding-right: 34px;
+  appearance: none; -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2 4l4 4 4-4' fill='none' stroke='%236B7C8C' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 12px center;
+}
+.rf-select option { background: #FFFFFF; }
+.rf-actualizar { width: 40px; height: 40px; padding: 0; font-size: 18px; border-radius: 8px; flex-shrink: 0; }
+.table-card th.rf-nro, .table-card td.rf-nro { width: 48px; text-align: center; color: #6B7C8C; }
+@media (max-width: 768px) {
+  .rf-busqueda { flex-basis: 100%; }
+  .rf-acciones { width: 100%; }
+  .rf-select { flex: 1; width: auto; }
+}

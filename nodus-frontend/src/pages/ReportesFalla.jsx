@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import api from '../api';
 import { useToast, mensajeDeError } from '../components/Toast';
 
@@ -7,11 +7,15 @@ import { useToast, mensajeDeError } from '../components/Toast';
 
 const ESTADOS = ['Pendiente', 'Convertido en OT', 'Descartado'];
 
+// Minúsculas y sin tildes, para que "jose" encuentre "José"
+const normalizar = (s) => String(s ?? '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+
 function ReportesFalla() {
   const toast = useToast();
   const [reportes, setReportes] = useState([]);
   const [servicios, setServicios] = useState([]);
   const [filtroEstado, setFiltroEstado] = useState('Pendiente');
+  const [busqueda, setBusqueda] = useState('');
   const [cargando, setCargando] = useState(true);
   const [procesando, setProcesando] = useState(null);
   // Reporte que se está convirtiendo en OT (modal para elegir el servicio)
@@ -37,6 +41,15 @@ function ReportesFalla() {
   useEffect(() => {
     api.get('/servicios').then(r => setServicios(r.data)).catch(() => { /* el modal avisa si falta */ });
   }, []);
+
+  // Filtra en el momento sobre equipo (nombre y serie), quién reportó (nombre y legajo) y descripción
+  const visibles = useMemo(() => {
+    const q = normalizar(busqueda.trim());
+    if (!q) return reportes;
+    return reportes.filter(r =>
+      [r.equipo, r.nroSerie, r.nombreCompleto, r.legajo, r.descripcion].some(c => normalizar(c).includes(q))
+    );
+  }, [reportes, busqueda]);
 
   const abrirConvertir = (rep) => {
     setConvirtiendo(rep);
@@ -95,24 +108,37 @@ function ReportesFalla() {
       </header>
 
       <div className="page-content">
-        <div className="form-card" style={{ padding: 16 }}>
-          <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-            <select value={filtroEstado} onChange={e => cambiarFiltro(e.target.value)} style={{ minWidth: 200 }}>
+        <div className="form-card rf-filtros">
+          <div className="rf-busqueda">
+            <span className="rf-lupa">🔍</span>
+            <input
+              type="text" value={busqueda} onChange={e => setBusqueda(e.target.value)}
+              placeholder="Buscar por equipo, quién reportó o descripción..."
+              aria-label="Buscar reportes"
+            />
+            {busqueda && (
+              <button type="button" className="rf-limpiar" onClick={() => setBusqueda('')}
+                title="Limpiar búsqueda" aria-label="Limpiar búsqueda">×</button>
+            )}
+          </div>
+          <div className="rf-acciones">
+            <select className="rf-select" value={filtroEstado} onChange={e => cambiarFiltro(e.target.value)} aria-label="Filtrar por estado">
               <option value="">Todos los estados</option>
               {ESTADOS.map(e => <option key={e} value={e}>{e}</option>)}
             </select>
-            <button className="btn-ghost" onClick={cargar} disabled={cargando}>↻ Actualizar</button>
+            <button type="button" className="btn-ghost rf-actualizar" onClick={cargar} disabled={cargando}
+              title="Actualizar" aria-label="Actualizar">↻</button>
           </div>
         </div>
 
         <div className="table-card">
           <div className="table-header">
-            <span>{reportes.length} {reportes.length === 1 ? 'reporte' : 'reportes'}</span>
+            <span>{visibles.length} {visibles.length === 1 ? 'reporte' : 'reportes'}</span>
           </div>
           <table>
             <thead>
               <tr>
-                <th>ID</th>
+                <th className="rf-nro">N°</th>
                 <th>Fecha</th>
                 <th>Equipo</th>
                 <th>Reportó</th>
@@ -122,9 +148,9 @@ function ReportesFalla() {
               </tr>
             </thead>
             <tbody>
-              {reportes.map(r => (
+              {visibles.map((r, i) => (
                 <tr key={r.idReporteFalla}>
-                  <td className="td-id">#{r.idReporteFalla}</td>
+                  <td className="rf-nro">{i + 1}</td>
                   <td style={{ whiteSpace: 'nowrap' }}>
                     {new Date(r.fechaReporte).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' })}
                   </td>
@@ -154,9 +180,10 @@ function ReportesFalla() {
                   </td>
                 </tr>
               ))}
-              {!cargando && reportes.length === 0 && (
+              {!cargando && visibles.length === 0 && (
                 <tr><td colSpan="7" className="empty">
-                  {filtroEstado ? `No hay reportes en estado "${filtroEstado}".` : 'No hay reportes de falla.'}
+                  {busqueda.trim() ? 'No se encontraron reportes para tu búsqueda.'
+                    : filtroEstado ? `No hay reportes en estado "${filtroEstado}".` : 'No hay reportes de falla.'}
                 </td></tr>
               )}
             </tbody>
