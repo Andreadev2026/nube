@@ -102,7 +102,7 @@ function ReportesFalla() {
   return (
     <>
       <header className="topbar">
-        <h2>REPORTES DE FALLA</h2>
+        <h2>REGISTROS DE FALLA</h2>
         <span className="badge" style={{ background: 'rgba(245,166,35,0.15)', color: '#A37715', borderColor: 'rgba(245,166,35,0.3)' }}>QR</span>
         <span className="desc">Fallas reportadas desde la ficha QR de los equipos</span>
       </header>

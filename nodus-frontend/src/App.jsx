@@ -228,7 +228,7 @@ function Sidebar({ auth, onLogout, mobileOpen, onNavigate }) {
                 {puedeHacer(rol, 'gestionar_reportes_falla') && (
                   <NavLink to="/reportesfalla" className="sn-item">
                     <IconAlertTriangle size={16} stroke={2} />
-                    <span>Reportes de falla</span>
+                    <span>Registros de falla</span>
                   </NavLink>
                 )}
               </div>
