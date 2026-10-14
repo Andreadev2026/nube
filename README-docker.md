@@ -38,20 +38,44 @@ docker compose up -d --build
 
 ## HTTPS para probar desde el celular
 La cámara del escáner QR solo funciona con conexión segura: `http://localhost` sirve en la PC, pero desde el celular hace falta HTTPS.
+Se usa una CA local (instalada una sola vez en el celular) que firma el certificado del servidor. Todo queda en `certs/`, que está en `.gitignore`.
 
-1. Ver la IP de la PC en la red Wi-Fi (`ipconfig`, "Dirección IPv4"), por ejemplo `192.168.0.35`.
-2. Generar un certificado autofirmado para esa IP (queda en `certs/`, que está en `.gitignore`):
+1. Datos de la PC: nombre (`hostname`, por ejemplo `TuCla` → `TuCla.local`) e IP en la Wi-Fi (`ipconfig`, "Dirección IPv4").
+2. Crear la CA, una sola vez. Está restringida a ese nombre y a IPs privadas, así que no sirve para otros sitios:
    ```bash
-   mkdir -p certs
-   MSYS_NO_PATHCONV=1 openssl req -x509 -newkey rsa:2048 -nodes -days 365 \
-     -keyout certs/nodus.key -out certs/nodus.crt -subj "/CN=NODUS local" \
-     -addext "subjectAltName=IP:192.168.0.35,IP:127.0.0.1,DNS:localhost"
+   cd certs
+   export MSYS_NO_PATHCONV=1   # solo en Git Bash de Windows
+   openssl req -x509 -newkey rsa:2048 -nodes -days 825 -sha256 -keyout nodus-ca.key -out nodus-ca.crt \
+     -subj "/CN=NODUS CA local (TuCla)" \
+     -addext "basicConstraints=critical,CA:TRUE,pathlen:0" -addext "keyUsage=critical,keyCertSign,cRLSign" \
+     -addext "nameConstraints=critical,permitted;DNS:TuCla.local,permitted;DNS:tucla.local,permitted;DNS:localhost,permitted;IP:192.168.0.0/255.255.0.0,permitted;IP:127.0.0.0/255.0.0.0,permitted;IP:10.0.0.0/255.0.0.0,permitted;IP:172.16.0.0/255.240.0.0"
    ```
-   (`MSYS_NO_PATHCONV=1` solo hace falta en Git Bash de Windows.) Si la IP cambia, regenerarlo y reiniciar `web`.
-3. Levantar con el override de HTTPS:
+3. Crear el certificado del servidor (repetir solo esto si cambia la IP, sin reinstalar nada en el celular). En `servidor.ext` poner:
+   ```
+   basicConstraints=critical,CA:FALSE
+   keyUsage=critical,digitalSignature,keyEncipherment
+   extendedKeyUsage=serverAuth
+   subjectAltName=DNS:TuCla.local,DNS:tucla.local,DNS:localhost,IP:127.0.0.1,IP:<IP de la PC>
+   ```
    ```bash
-   docker compose -f docker-compose.yml -f docker-compose.https.yml up -d
+   openssl req -newkey rsa:2048 -nodes -keyout nodus.key -out nodus.csr -subj "/CN=TuCla.local"
+   openssl x509 -req -in nodus.csr -CA nodus-ca.crt -CAkey nodus-ca.key -CAcreateserial -days 397 -sha256 \
+     -extfile servidor.ext -out nodus.crt
    ```
-4. En el celular, conectado a la misma Wi-Fi, abrir `https://192.168.0.35`. El navegador avisa que el certificado no es confiable: elegir "Avanzado" → "Continuar". Después la cámara pide permiso normalmente.
+4. Levantar con el override de HTTPS (siempre con los dos `-f`; sin el override se pierde el puerto 443):
+   ```bash
+   docker compose -f docker-compose.yml -f docker-compose.https.yml up -d --build web
+   ```
+5. Firewall de Windows: la red Wi-Fi en "Privada" y el puerto 443 abierto (PowerShell como administrador):
+   ```powershell
+   New-NetFirewallRule -DisplayName "NODUS 443" -Direction Inbound -Protocol TCP -LocalPort 443 -Action Allow -Profile Any
+   ```
+6. Instalar la CA en el celular, una sola vez, descargándola de `http://<IP de la PC>/nodus-ca.crt`:
+   - **iPhone** (con Safari): permitir la descarga → Ajustes → "Perfil descargado" → Instalar. Después Ajustes → General → Información → Ajustes de confianza de certificados → activar "NODUS CA local (TuCla)".
+   - **Android**: Ajustes → Seguridad → Más ajustes → Cifrado y credenciales → Instalar un certificado → Certificado de CA → elegir el archivo descargado.
+7. Abrir `https://TuCla.local` (o `https://<IP de la PC>`) en el celular, en la misma Wi-Fi.
+
+Para quitar la CA del iPhone: Ajustes → General → VPN y gestión de dispositivos → el perfil → Eliminar.
+Si un antivirus inspecciona HTTPS en la PC (por ejemplo Avast Web Shield), las pruebas con curl desde la PC muestran su certificado y no el de NODUS: probar desde el celular.
 
 Para volver a solo HTTP: `docker compose up -d` (sin el override).
