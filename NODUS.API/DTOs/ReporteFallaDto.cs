@@ -19,6 +19,10 @@ namespace NODUS.API.DTOs
         public List<string> Alertas { get; set; } = new();
         public List<string> Componentes { get; set; } = new();
         public bool ReportadoHoy { get; set; }
+        public int IdEstado { get; set; }
+        // Solo los equipos "En servicio" admiten reportes de falla; si no, el motivo para mostrar en la ficha
+        public bool PuedeReportar { get; set; }
+        public string? MotivoNoReportable { get; set; }
     }
 
     public class ReporteFallaInputDto

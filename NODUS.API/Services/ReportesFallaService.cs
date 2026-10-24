@@ -68,15 +68,36 @@ namespace NODUS.API.Services
                         .Select(a => a.Tipo)
                         .Distinct()
                         .ToList(),
-                    Componentes = e.EquipoComponentes.Select(c => c.Componente).ToList()
+                    Componentes = e.EquipoComponentes.Select(c => c.Componente).ToList(),
+                    IdEstado = e.IdEstado
                 })
                 .AsNoTracking()
                 .FirstOrDefaultAsync();
 
             if (ficha != null)
+            {
+                ficha.MotivoNoReportable = MotivoNoReportable(ficha.IdEstado);
+                ficha.PuedeReportar = ficha.MotivoNoReportable == null;
                 ficha.ReportadoHoy = await ReportadoHoy(idEquipo);
+            }
             return ficha;
         }
+
+        // Solo se reportan fallas de equipos "En servicio": en los demás estados el equipo
+        // ya está en manos de mantenimiento, fuera del hospital o fuera de uso
+        public static string? MotivoNoReportable(int idEstado) => idEstado switch
+        {
+            EstadosOTService.ID_ESTADO_EN_SERVICIO => null,
+            EstadosOTService.ID_ESTADO_EN_MANTENIMIENTO =>
+                "El equipo está en mantenimiento. Mantenimiento ya está trabajando en él.",
+            EstadosOTService.ID_ESTADO_FUERA_DE_SERVICIO =>
+                "El equipo está fuera de servicio y ya tiene una orden de trabajo abierta. Mantenimiento ya fue notificado.",
+            EstadosOTService.ID_ESTADO_EN_PRESTAMO =>
+                "El equipo está en préstamo externo. No se pueden reportar fallas hasta que sea devuelto.",
+            EstadosOTService.ID_ESTADO_BAJA_PATRIMONIAL =>
+                "El equipo fue dado de baja patrimonial y ya no está en uso.",
+            _ => "El equipo no está en servicio. No se pueden reportar fallas en su estado actual."
+        };
 
         // Búsqueda manual cuando no se puede escanear el QR: primero por número de serie exacto
         // (sin distinguir mayúsculas), después por ID. Solo devuelve el ID para abrir la ficha QR.
@@ -100,8 +121,14 @@ namespace NODUS.API.Services
 
         public async Task<RespuestaReporte> Crear(int idEquipo, int idUsuario, ReporteFallaInputDto input)
         {
-            if (!await _db.Equipos.AnyAsync(e => e.IdEquipo == idEquipo))
+            var idEstado = await _db.Equipos
+                .Where(e => e.IdEquipo == idEquipo)
+                .Select(e => (int?)e.IdEstado)
+                .FirstOrDefaultAsync();
+            if (idEstado == null)
                 return new(ResultadoReporte.NoEncontrado, "El equipo no existe.");
+            var motivo = MotivoNoReportable(idEstado.Value);
+            if (motivo != null) return new(ResultadoReporte.Invalido, motivo);
 
             var nombre = input.NombreCompleto?.Trim() ?? "";
             var legajo = input.Legajo?.Trim() ?? "";

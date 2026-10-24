@@ -38,6 +38,8 @@ function FichaQREquipo({ idEquipo, auth, onLogout }) {
   const rol = auth?.usuario?.rol;
   const esPersonalAsistencial = rol === ROL_PERSONAL_ASISTENCIAL;
   const puedeReportar = puedeHacer(rol, 'reportar_falla');
+  // Solo los equipos "En servicio" admiten reportes; en otro estado la ficha queda de solo lectura
+  const equipoReportable = ficha?.puedeReportar === true;
 
   useEffect(() => {
     let cancelado = false;
@@ -200,7 +202,17 @@ function FichaQREquipo({ idEquipo, auth, onLogout }) {
         <FilaDato label="Alertas registradas" valor={ficha.alertas?.length ? ficha.alertas.join(', ') : 'Ninguna'} ultima />
       </div>
 
-      {puedeReportar && (
+      {puedeReportar && !equipoReportable && (
+        <div role="status" style={{
+          ...cardStyle, background: '#F8FAFC', borderLeft: '4px solid #9E9CBB',
+          fontSize: 13.5, color: '#4A5868', lineHeight: 1.5
+        }}>
+          <div style={{ fontWeight: 700, color: '#1a1a1a', marginBottom: 4 }}>No se pueden reportar fallas</div>
+          {ficha.motivoNoReportable || 'El equipo no está en servicio.'}
+        </div>
+      )}
+
+      {puedeReportar && equipoReportable && (
         <div style={cardStyle}>
           <div style={{ ...tituloCard, marginBottom: 2, letterSpacing: 0.4 }}>REPORTAR FALLA</div>
           <div style={{ fontSize: 12, color: '#9E9CBB', marginBottom: 14 }}>Todos los campos son obligatorios</div>
