@@ -555,6 +555,8 @@ tbody td { padding: 9px 12px; color: #2D3748; }
 .rf-select option { background: #FFFFFF; }
 .rf-actualizar { width: 40px; height: 40px; padding: 0; font-size: 18px; border-radius: 8px; flex-shrink: 0; }
 .table-card th.rf-nro, .table-card td.rf-nro { width: 48px; text-align: center; color: #6B7C8C; }
+/* Ajusta por palabras (no letra por letra) y con un ancho mínimo para que la columna no se aplaste */
+.table-card td.rf-descripcion { white-space: pre-wrap; overflow-wrap: break-word; min-width: 220px; max-width: 360px; }
 @media (max-width: 768px) {
   .rf-busqueda { flex-basis: 100%; }
   .rf-acciones { width: 100%; }

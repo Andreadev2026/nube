@@ -1,8 +1,9 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import api from '../api';
 import { useToast, mensajeDeError } from '../components/Toast';
+import ConfirmarDialogo from '../components/ConfirmarDialogo';
 
-// Reportes de falla enviados desde la ficha QR. Mantenimiento los convierte en OT o los descarta.
+// Reportes de falla enviados desde la ficha QR. Mantenimiento los revisa y puede descartarlos.
 // Solo Administrador, Jefe patrimonio y Jefe servicio (ver permisos.js y el backend).
 
 const ESTADOS = ['Pendiente', 'Convertido en OT', 'Descartado'];
@@ -13,14 +14,12 @@ const normalizar = (s) => String(s ?? '').toLowerCase().normalize('NFD').replace
 function ReportesFalla() {
   const toast = useToast();
   const [reportes, setReportes] = useState([]);
-  const [servicios, setServicios] = useState([]);
   const [filtroEstado, setFiltroEstado] = useState('Pendiente');
   const [busqueda, setBusqueda] = useState('');
   const [cargando, setCargando] = useState(true);
   const [procesando, setProcesando] = useState(null);
-  // Reporte que se está convirtiendo en OT (modal para elegir el servicio)
-  const [convirtiendo, setConvirtiendo] = useState(null);
-  const [idServicio, setIdServicio] = useState('');
+  // Reporte a descartar (abre el diálogo de confirmación)
+  const [aDescartar, setADescartar] = useState(null);
   // Se incrementa para volver a pedir la lista
   const [version, setVersion] = useState(0);
 
@@ -38,10 +37,6 @@ function ReportesFalla() {
   const cargar = () => { setCargando(true); setVersion(v => v + 1); };
   const cambiarFiltro = (estado) => { setCargando(true); setFiltroEstado(estado); };
 
-  useEffect(() => {
-    api.get('/servicios').then(r => setServicios(r.data)).catch(() => { /* el modal avisa si falta */ });
-  }, []);
-
   // Filtra en el momento sobre equipo (nombre y serie), quién reportó (nombre y legajo), servicio y descripción
   const visibles = useMemo(() => {
     const q = normalizar(busqueda.trim());
@@ -51,36 +46,15 @@ function ReportesFalla() {
     );
   }, [reportes, busqueda]);
 
-  const abrirConvertir = (rep) => {
-    setConvirtiendo(rep);
-    setIdServicio(rep.idServicioSugerido ? String(rep.idServicioSugerido) : '');
-  };
+  const cancelarDescarte = useCallback(() => setADescartar(null), []);
 
-  const confirmarConvertir = async () => {
-    if (!idServicio) {
-      toast.warning('Falta el servicio', 'Elegí el servicio al que se asigna la orden de trabajo.');
-      return;
-    }
-    const rep = convirtiendo;
-    setProcesando(rep.idReporteFalla);
-    try {
-      const r = await api.post(`/reportes-falla/${rep.idReporteFalla}/convertir-en-ot`, { idServicio: parseInt(idServicio) });
-      toast.success('Orden de trabajo creada', `Se creó la OT #${r.data.idOT} en estado Pendiente.`);
-      setConvirtiendo(null);
-      cargar();
-    } catch (err) {
-      toast.error('No se pudo convertir en OT', mensajeDeError(err, 'Error de conexión con el servidor.'));
-    } finally {
-      setProcesando(null);
-    }
-  };
-
-  const descartar = async (rep) => {
-    if (!window.confirm(`¿Descartar el reporte de ${rep.nombreCompleto} sobre ${rep.equipo}? El equipo se podrá volver a reportar hoy.`)) return;
+  const confirmarDescarte = async () => {
+    const rep = aDescartar;
     setProcesando(rep.idReporteFalla);
     try {
       await api.put(`/reportes-falla/${rep.idReporteFalla}/descartar`);
       toast.info('Reporte descartado', 'El equipo se puede volver a reportar.');
+      setADescartar(null);
       cargar();
     } catch (err) {
       toast.error('No se pudo descartar', mensajeDeError(err, 'Error de conexión con el servidor.'));
@@ -161,23 +135,17 @@ function ReportesFalla() {
                     <div style={{ fontSize: 11.5, color: '#9E9CBB' }}>Legajo {r.legajo} · usuario {r.usuario}</div>
                   </td>
                   <td>{r.servicio || <span style={{ color: '#9E9CBB' }}>—</span>}</td>
-                  <td style={{ maxWidth: 360, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{r.descripcion}</td>
+                  <td className="rf-descripcion">{r.descripcion}</td>
                   <td>
                     <span style={chipEstado(r.estado)}>{r.estado}</span>
                     {r.idOT && <div style={{ fontSize: 11.5, color: '#9E9CBB', marginTop: 4 }}>OT #{r.idOT}</div>}
                   </td>
                   <td style={{ whiteSpace: 'nowrap' }}>
                     {r.estado === 'Pendiente' ? (
-                      <>
-                        <button className="btn-primary" style={{ fontSize: 12, padding: '6px 10px' }}
-                          disabled={procesando === r.idReporteFalla} onClick={() => abrirConvertir(r)}>
-                          Convertir en OT
-                        </button>
-                        <button className="btn-ghost" style={{ fontSize: 12, padding: '6px 10px', marginLeft: 6 }}
-                          disabled={procesando === r.idReporteFalla} onClick={() => descartar(r)}>
-                          Descartar
-                        </button>
-                      </>
+                      <button className="btn-ghost" style={{ fontSize: 12, padding: '6px 10px' }}
+                        disabled={procesando === r.idReporteFalla} onClick={() => setADescartar(r)}>
+                        Descartar
+                      </button>
                     ) : '—'}
                   </td>
                 </tr>
@@ -193,35 +161,19 @@ function ReportesFalla() {
         </div>
       </div>
 
-      {convirtiendo && (
-        <div onClick={() => procesando || setConvirtiendo(null)} style={{
-          position: 'fixed', inset: 0, background: 'rgba(16,24,40,0.45)', zIndex: 1000,
-          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16
-        }}>
-          <div onClick={e => e.stopPropagation()} style={{
-            background: 'white', borderRadius: 14, padding: 22, width: '100%', maxWidth: 440,
-            boxShadow: '0 12px 32px rgba(16,24,40,0.18)'
-          }}>
-            <h3 style={{ margin: '0 0 6px', fontSize: 16, color: '#1a1a1a' }}>Convertir en orden de trabajo</h3>
-            <p style={{ margin: '0 0 14px', fontSize: 13, color: '#6B7C8C', lineHeight: 1.45 }}>
-              Se crea una OT correctiva en estado Pendiente para <strong>{convirtiendo.equipo}</strong> (S/N {convirtiendo.nroSerie}).
-              El equipo pasa a "Fuera de servicio".
-            </p>
-            <div className="form-group" style={{ marginBottom: 16 }}>
-              <label>Servicio *</label>
-              <select value={idServicio} onChange={e => setIdServicio(e.target.value)} style={{ width: '100%' }}>
-                <option value="">Seleccionar...</option>
-                {servicios.map(s => <option key={s.idServicio} value={s.idServicio}>{s.nombre}</option>)}
-              </select>
-            </div>
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <button className="btn-ghost" onClick={() => setConvirtiendo(null)} disabled={!!procesando}>Cancelar</button>
-              <button className="btn-primary" onClick={confirmarConvertir} disabled={!!procesando}>
-                {procesando ? 'Creando...' : 'Crear OT'}
-              </button>
-            </div>
-          </div>
-        </div>
+      {aDescartar && (
+        <ConfirmarDialogo
+          titulo="Descartar reporte"
+          mensaje={<>
+            ¿Descartar el reporte de <strong>{aDescartar.nombreCompleto}</strong> sobre <strong>{aDescartar.equipo}</strong>?
+            <br />El equipo se podrá volver a reportar hoy.
+          </>}
+          textoConfirmar="Descartar"
+          destructivo
+          procesando={procesando === aDescartar.idReporteFalla}
+          onConfirmar={confirmarDescarte}
+          onCancelar={cancelarDescarte}
+        />
       )}
     </>
   );
